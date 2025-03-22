@@ -1,13 +1,7 @@
 import streamlit as st
 import requests
-""from ml_model import get_recommendations
+from ml_module import get_recommendations
 
-@app.post("/recommend/")
-async def recommend_products(user_input: dict):
-    query = user_input.get("query", "")
-    recommended_products = get_recommendations(query)  # Works as-is
-    product_details = fetch_product_details(recommended_products)
-    return {"recommendations": product_details}""
 # Title
 st.title("Product Recommendation System")
 
@@ -22,12 +16,15 @@ if st.button("Get Recommendations"):
     query_params = {}
     if keywords:
         query_params["keywords"] = keywords
-    if price > 0:  # Only include if user sets a value
+    if price > 0:  # Only include if user sets a value greater than 0
         query_params["price"] = price
     if stars > 0:  # Only include if user sets a minimum
         query_params["stars"] = stars
 
-    if query_params:
+    # Check if price is 0 before proceeding
+    if price == 0:
+        st.warning("You can't buy products for free! Please set a maximum price greater than 0.")
+    elif query_params:  # Proceed only if there are valid parameters and price > 0
         try:
             # Send POST request to backend
             response = requests.post(
