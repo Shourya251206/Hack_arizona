@@ -1,6 +1,13 @@
 import streamlit as st
 import requests
+""from ml_model import get_recommendations
 
+@app.post("/recommend/")
+async def recommend_products(user_input: dict):
+    query = user_input.get("query", "")
+    recommended_products = get_recommendations(query)  # Works as-is
+    product_details = fetch_product_details(recommended_products)
+    return {"recommendations": product_details}""
 # Title
 st.title("Product Recommendation System")
 
