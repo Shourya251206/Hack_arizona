@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Step 1: Read the CSV file
-file_path = "amazon_products.csv"  # Change this to your actual file path
+file_path = "merged_with_category.csv"  # Change this to your actual file path
 df = pd.read_csv(file_path)
 
 # Step 2: Remove duplicate rows
@@ -21,7 +21,7 @@ else:
 
 
 # Define the output file name
-output_file = "cleaned_data.csv"
+output_file = "erged_with_category_cleaned.csv"
 
 # Save the cleaned DataFrame to a new CSV file
 df.to_csv(output_file, index=False)
@@ -29,4 +29,3 @@ df.to_csv(output_file, index=False)
 print(f"✅ Cleaned data has been saved to '{output_file}'.")
 
 print(df.info())
-
