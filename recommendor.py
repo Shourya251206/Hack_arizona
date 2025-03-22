@@ -221,6 +221,30 @@ class AmazonProductRecommender:
         self.cosine_model = None
         self.cluster_model = None
         self.query_generator = QueryGenerator(amazon_data)
+    def build_cosine_model(self):
+        """Build a TF-IDF + Cosine Similarity model based on product titles and descriptions"""
+        print("Building cosine similarity model...")
+        if 'title' not in self.product_data.columns:
+            raise ValueError("Product data must contain a 'title' column")
+
+        # Combine title and description (if available)
+        if 'description' in self.product_data.columns:
+            self.product_data['text'] = (
+                self.product_data['title'].fillna('') + " " +
+                self.product_data['description'].fillna('')
+            )
+        else:
+            self.product_data['text'] = self.product_data['title'].fillna('')
+
+        # Create TF-IDF matrix
+        vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
+        tfidf_matrix = vectorizer.fit_transform(self.product_data['text'])
+
+        # Compute cosine similarity matrix
+        self.cosine_model = cosine_similarity(tfidf_matrix)
+
+        
+
         
     # [Rest of the AmazonProductRecommender class stays the same]
     # ... [Include all previous methods from AmazonProductRecommender]
