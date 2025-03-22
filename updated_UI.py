@@ -19,6 +19,26 @@ st.markdown(
         margin-bottom: 20px;
         text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
     }
+    .subtitle {
+        color: #555;
+        text-align: center;
+        font-size: 18px;
+        margin-bottom: 30px;
+    }
+    .search-container {
+        background-color: #fff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 30px;
+    }
+    .search-title {
+        color: #4361ee;
+        font-size: 22px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        text-align: center;
+    }
     .product-card {
         background-color: #ffffff;
         padding: 20px;
@@ -91,9 +111,13 @@ st.markdown(
         background-color: #4361ee;
         color: white;
         border-radius: 8px;
-        padding: 8px 15px;
+        padding: 12px 15px;
+        font-weight: bold;
         width: 100%;
-        margin-top: 10px;
+        transition: background-color 0.3s ease;
+    }
+    .search-btn:hover {
+        background-color: #3a56d4;
     }
     .cart-total {
         font-weight: bold;
@@ -107,14 +131,20 @@ st.markdown(
         padding: 30px;
         font-style: italic;
     }
+    .zero-price-message {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 15px;
+        border-radius: 8px;
+        border-left: 5px solid #ffc107;
+        margin: 15px 0;
+        text-align: center;
+        font-size: 16px;
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
-
-# Sidebar for User Input with improved styling
-st.sidebar.markdown('<div class="sidebar-header">🔍 Search for Products</div>', unsafe_allow_html=True)
-query = st.sidebar.text_input("Enter your preference (e.g., 'running shoes under $100'):")
 
 # Initialize session state for history & cart if not already set
 if "search_history" not in st.session_state:
@@ -123,8 +153,10 @@ if "cart" not in st.session_state:
     st.session_state.cart = []
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
+if "price_range" not in st.session_state:
+    st.session_state.price_range = (0, 1000)
 
-# Dark Mode Toggle with better explanation
+# Dark Mode Toggle in sidebar
 dark_mode_toggle = st.sidebar.checkbox("🌙 Enable Dark Mode", st.session_state.dark_mode)
 if dark_mode_toggle != st.session_state.dark_mode:
     st.session_state.dark_mode = dark_mode_toggle
@@ -140,6 +172,16 @@ if st.session_state.dark_mode:
             color: #e0e0e0;
         }
         .title {
+            color: #738bff;
+        }
+        .subtitle {
+            color: #aaa;
+        }
+        .search-container {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+        }
+        .search-title {
             color: #738bff;
         }
         .product-card {
@@ -163,51 +205,104 @@ if st.session_state.dark_mode:
         .empty-state {
             color: #adb5bd;
         }
+        .zero-price-message {
+            background-color: #332701;
+            color: #ffda6a;
+            border-left: 5px solid #ffda6a;
+        }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-# Get Recommendations - Enhanced button styling
-if st.sidebar.button("🔍 Get Recommendations", key="recommend_btn", help="Click to find products matching your query"):
+# Display the main title
+st.markdown('<div class="title">Smart Shop</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Find the perfect products for your needs</div>', unsafe_allow_html=True)
+
+# Central search container instead of sidebar
+st.markdown('<div class="search-container">', unsafe_allow_html=True)
+st.markdown('<div class="search-title">🔍 Search for Products</div>', unsafe_allow_html=True)
+
+# Three input elements in columns
+col1, col2, col3 = st.columns([3, 2, 1])
+
+with col1:
+    # 1. Keywords search input
+    query = st.text_input("Enter keywords (e.g., 'running shoes', 'laptop')", key="search_keywords")
+
+with col2:
+    # 2. Price range slider
+    price_range = st.slider("Price Range ($)", 0, 1000, st.session_state.price_range, key="price_slider")
+    st.session_state.price_range = price_range
+
+with col3:
+    # 3. Search button (with space above to align with other elements)
+    st.write("")  # Add some space to align with the inputs
+    search_clicked = st.button("🔍 Search", key="search_button", use_container_width=True)
+
+st.markdown('</div>', unsafe_allow_html=True)  # Close search container
+
+# Process search when the button is clicked
+if search_clicked:
     if query:
         try:
+            # Modify API request to include price range
+            min_price, max_price = price_range
             # Replace with actual API endpoint
-            response = requests.get(f"http://127.0.0.1:8000/recommend?query={query}")
+            response = requests.get(f"http://127.0.0.1:8000/recommend?query={query}&min_price={min_price}&max_price={max_price}")
+            
             if response.status_code == 200:
                 data = response.json()
                 if data["recommendations"]:
                     st.markdown('<div class="title">🛍️ Recommended Products</div>', unsafe_allow_html=True)
                     product_list = []
                     
-                    # Display products in a grid layout
-                    cols = st.columns(3)
-                    for i, product in enumerate(data["recommendations"]):
-                        product_list.append({"name": product['name'], "price": product['price'], "image_url": product['image_url']})
-                        with cols[i % 3]:
-                            st.markdown(f"""
-                            <div class="product-card">
-                                <img src="{product['image_url']}" class="product-image">
-                                <div class="product-name">{product['name']}</div>
-                                <div class="product-price">${product['price']}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            if st.button(f"🛒 Add to Cart", key=f"add_{product['name']}"):
-                                st.session_state.cart.append(product)
-                                st.success(f"{product['name']} added to cart!")
+                    # Filter out zero-priced items and check if any valid products remain
+                    valid_products = [product for product in data["recommendations"] 
+                                      if float(product['price']) > 0]
                     
-                    # Save search history
-                    st.session_state.search_history.append({"query": query, "products": product_list})
+                    # Show a message if all products are priced at $0
+                    if not valid_products and data["recommendations"]:
+                        st.markdown(
+                            '<div class="zero-price-message">⚠️ No items found for $0. Try a different search query.</div>',
+                            unsafe_allow_html=True
+                        )
+                    
+                    # Display products in a grid layout - only non-zero priced items
+                    if valid_products:
+                        cols = st.columns(3)
+                        for i, product in enumerate(valid_products):
+                            product_list.append({"name": product['name'], "price": product['price'], 
+                                              "image_url": product['image_url']})
+                            with cols[i % 3]:
+                                st.markdown(f"""
+                                <div class="product-card">
+                                    <img src="{product['image_url']}" class="product-image">
+                                    <div class="product-name">{product['name']}</div>
+                                    <div class="product-price">${product['price']}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                if st.button(f"🛒 Add to Cart", key=f"add_{product['name']}"):
+                                    st.session_state.cart.append(product)
+                                    st.success(f"{product['name']} added to cart!")
+                    
+                    # Save search history (including the message about zero-priced items)
+                    if product_list:
+                        st.session_state.search_history.append({
+                            "query": query, 
+                            "price_range": price_range,
+                            "products": product_list
+                        })
                 else:
-                    st.sidebar.warning("No recommendations found. Try another query.")
+                    st.warning("No recommendations found matching your criteria. Try adjusting your search or price range.")
             else:
-                st.sidebar.error("Error fetching recommendations from the backend.")
+                st.error("Error fetching recommendations from the backend.")
         except Exception as e:
-            st.sidebar.error(f"An error occurred: {e}")
+            st.error(f"An error occurred: {e}")
     else:
-        st.sidebar.warning("Please enter a query before submitting.")
+        st.warning("Please enter keywords before searching.")
 
-# Display Cart with improved styling and functionality
+# Display Cart in sidebar with improved styling and functionality
 st.sidebar.markdown('<div class="sidebar-header">🛒 Shopping Cart</div>', unsafe_allow_html=True)
 if st.session_state.cart:
     total = 0
@@ -239,7 +334,8 @@ else:
 if st.session_state.search_history:
     with st.expander("📜 View Search History"):
         for i, entry in enumerate(reversed(st.session_state.search_history)):
-            st.write(f"**Search Query #{i+1}:** {entry['query']}")
+            price_info = f"Price range: ${entry.get('price_range', (0, 1000))[0]} - ${entry.get('price_range', (0, 1000))[1]}"
+            st.write(f"**Search #{i+1}:** {entry['query']} ({price_info})")
             
             # Display products in a horizontal layout
             cols = st.columns(min(3, len(entry["products"])))
@@ -252,12 +348,12 @@ if st.session_state.search_history:
 else:
     st.markdown('<div class="empty-state">Your search history will appear here</div>', unsafe_allow_html=True)
 
-# Display welcome message when no products are shown
-if not query:
-    st.markdown('<div class="title">Welcome to Smart Shop</div>', unsafe_allow_html=True)
+# Display welcome message when no products are shown yet
+if not search_clicked and not st.session_state.search_history:
     st.markdown("""
-    <div style="text-align: center; padding: 30px;">
-        <h3>Start by searching for products you're interested in</h3>
-        <p>Enter keywords, price ranges, or specific product types in the search box</p>
+    <div style="text-align: center; padding: 30px; margin-top: 20px;">
+        <h3>Ready to shop? Enter your search criteria above</h3>
+        <p>Use the search box to find products, adjust the price range to fit your budget, and click search!</p>
+        <p>Your product recommendations will appear here</p>
     </div>
     """, unsafe_allow_html=True)
