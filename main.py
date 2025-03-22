@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from ml_module import get_recommendations  
+from ml_module import get_recommendations  # Import ML function
 
 app = FastAPI()
 
+# Define input schema (all fields optional)
 class UserQuery(BaseModel):
     keywords: str | None = None
     price: float | None = None
