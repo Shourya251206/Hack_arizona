@@ -20,7 +20,7 @@ cursor.execute('''
 print("Table 'products' created or already exists.")
 
 # Step 3: Load the cleaned CSV into a DataFrame
-df = pd.read_csv("cleaned_data.csv")
+df = pd.read_csv("merged_with_category_cleaned.csv")
 print("Loaded cleaned_data.csv:")
 print(df.head())  # Preview the data
 
