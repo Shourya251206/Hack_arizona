@@ -4,7 +4,7 @@ import requests
 # Page Configuration
 st.set_page_config(page_title="Product Recommendation System", page_icon="🛒", layout="wide")
 
-# Custom CSS for styling - improved color scheme and visual design
+# Custom CSS (unchanged from your original)
 st.markdown(
     """
     <style>
@@ -146,7 +146,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Initialize session state for history & cart if not already set
+# Initialize session state
 if "search_history" not in st.session_state:
     st.session_state.search_history = []
 if "cart" not in st.session_state:
@@ -156,13 +156,13 @@ if "dark_mode" not in st.session_state:
 if "price_range" not in st.session_state:
     st.session_state.price_range = (0, 1000)
 
-# Dark Mode Toggle in sidebar
+# Dark Mode Toggle in sidebar (unchanged)
 dark_mode_toggle = st.sidebar.checkbox("🌙 Enable Dark Mode", st.session_state.dark_mode)
 if dark_mode_toggle != st.session_state.dark_mode:
     st.session_state.dark_mode = dark_mode_toggle
     st.experimental_rerun()
 
-# Apply Dark Mode CSS if enabled - enhanced for better contrast and readability
+# Apply Dark Mode CSS (unchanged)
 if st.session_state.dark_mode:
     st.markdown(
         """
@@ -215,60 +215,38 @@ if st.session_state.dark_mode:
         unsafe_allow_html=True
     )
 
-# Display the main title
+# Main title and subtitle
 st.markdown('<div class="title">Smart Shop</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitle">Find the perfect products for your needs</div>', unsafe_allow_html=True)
 
-# Central search container instead of sidebar
+# Simplified Search Input Section (adapted from your second file)
 st.markdown('<div class="search-container">', unsafe_allow_html=True)
 st.markdown('<div class="search-title">🔍 Search for Products</div>', unsafe_allow_html=True)
 
-# Three input elements in columns
-col1, col2, col3 = st.columns([3, 2, 1])
+query = st.text_input("Enter your preference (e.g., 'running shoes under $100')", key="search_keywords")
+search_clicked = st.button("Get Recommendations", key="search_button", use_container_width=True)
 
-with col1:
-    # 1. Keywords search input
-    query = st.text_input("Enter keywords (e.g., 'running shoes', 'laptop')", key="search_keywords")
-
-with col2:
-    # 2. Price range slider
-    price_range = st.slider("Price Range ($)", 0, 1000, st.session_state.price_range, key="price_slider")
-    st.session_state.price_range = price_range
-
-with col3:
-    # 3. Search button (with space above to align with other elements)
-    st.write("")  # Add some space to align with the inputs
-    search_clicked = st.button("🔍 Search", key="search_button", use_container_width=True)
-
-st.markdown('</div>', unsafe_allow_html=True)  # Close search container
+st.markdown('</div>', unsafe_allow_html=True)
 
 # Process search when the button is clicked
 if search_clicked:
     if query:
         try:
-            # Modify API request to include price range
-            min_price, max_price = price_range
-            # Replace with actual API endpoint
-            response = requests.get(f"http://127.0.0.1:8000/recommend?query={query}&min_price={min_price}&max_price={max_price}")
-            
+            response = requests.get(f"http://127.0.0.1:8000/recommend?query={query}")
             if response.status_code == 200:
                 data = response.json()
                 if data["recommendations"]:
                     st.markdown('<div class="title">🛍️ Recommended Products</div>', unsafe_allow_html=True)
                     product_list = []
                     
-                    # Filter out zero-priced items and check if any valid products remain
-                    valid_products = [product for product in data["recommendations"] 
-                                      if float(product['price']) > 0]
+                    valid_products = [product for product in data["recommendations"] if float(product['price']) > 0]
                     
-                    # Show a message if all products are priced at $0
                     if not valid_products and data["recommendations"]:
                         st.markdown(
                             '<div class="zero-price-message">⚠️ No items found for $0. Try a different search query.</div>',
                             unsafe_allow_html=True
                         )
                     
-                    # Display products in a grid layout - only non-zero priced items
                     if valid_products:
                         cols = st.columns(3)
                         for i, product in enumerate(valid_products):
@@ -286,23 +264,22 @@ if search_clicked:
                                     st.session_state.cart.append(product)
                                     st.success(f"{product['name']} added to cart!")
                     
-                    # Save search history (including the message about zero-priced items)
                     if product_list:
                         st.session_state.search_history.append({
                             "query": query, 
-                            "price_range": price_range,
+                            "price_range": st.session_state.price_range,  # Keeping this for compatibility
                             "products": product_list
                         })
                 else:
-                    st.warning("No recommendations found matching your criteria. Try adjusting your search or price range.")
+                    st.warning("No recommendations found matching your criteria. Try adjusting your search.")
             else:
                 st.error("Error fetching recommendations from the backend.")
         except Exception as e:
             st.error(f"An error occurred: {e}")
     else:
-        st.warning("Please enter keywords before searching.")
+        st.warning("Please enter a query before submitting.")
 
-# Display Cart in sidebar with improved styling and functionality
+# Display Cart in sidebar (unchanged)
 st.sidebar.markdown('<div class="sidebar-header">🛒 Shopping Cart</div>', unsafe_allow_html=True)
 if st.session_state.cart:
     total = 0
@@ -316,28 +293,24 @@ if st.session_state.cart:
         </div>
         """, unsafe_allow_html=True)
     
-    # Show cart total
     st.sidebar.markdown(f'<div class="cart-total">Total: ${total:.2f}</div>', unsafe_allow_html=True)
     
-    # Checkout button
     if st.sidebar.button("✅ Proceed to Checkout", key="checkout"):
         st.sidebar.success("Checkout process initiated!")
         
-    # Clear cart button
     if st.sidebar.button("🗑️ Clear Cart", key="clear_cart"):
         st.session_state.cart = []
         st.experimental_rerun()
 else:
     st.sidebar.markdown('<div class="empty-state">Your cart is empty</div>', unsafe_allow_html=True)
 
-# Display Search History with enhanced styling
+# Display Search History (unchanged)
 if st.session_state.search_history:
     with st.expander("📜 View Search History"):
         for i, entry in enumerate(reversed(st.session_state.search_history)):
             price_info = f"Price range: ${entry.get('price_range', (0, 1000))[0]} - ${entry.get('price_range', (0, 1000))[1]}"
             st.write(f"**Search #{i+1}:** {entry['query']} ({price_info})")
             
-            # Display products in a horizontal layout
             cols = st.columns(min(3, len(entry["products"])))
             for j, product in enumerate(entry["products"]):
                 with cols[j % len(cols)]:
@@ -348,12 +321,12 @@ if st.session_state.search_history:
 else:
     st.markdown('<div class="empty-state">Your search history will appear here</div>', unsafe_allow_html=True)
 
-# Display welcome message when no products are shown yet
+# Welcome message (unchanged)
 if not search_clicked and not st.session_state.search_history:
     st.markdown("""
     <div style="text-align: center; padding: 30px; margin-top: 20px;">
         <h3>Ready to shop? Enter your search criteria above</h3>
-        <p>Use the search box to find products, adjust the price range to fit your budget, and click search!</p>
+        <p>Use the search box to find products and click 'Get Recommendations'!</p>
         <p>Your product recommendations will appear here</p>
     </div>
     """, unsafe_allow_html=True)
