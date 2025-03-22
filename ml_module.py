@@ -9,42 +9,34 @@ import sqlite3
 
 class AmazonProductRecommender:
     def __init__(self):
-        """
-        Initialize the recommender with product data from products.db
-        """
         # Load data from SQLite
         conn = sqlite3.connect("products.db")
         self.product_data = pd.read_sql_query("SELECT * FROM products", conn)
         conn.close()
 
-        # Map database columns to expected ML columns
+        # Map database columns to ML expected columns
         self.product_data = self.product_data.rename(columns={
             "stars": "rating",
             "reviews": "review_count",
-            "category_id": "category",  # Assuming category_id can serve as category
-            "boughtInLastMonth": "sales_rank"  # Using boughtInLastMonth as proxy for sales_rank (higher is better, unlike sales_rank)
+            "category_id": "category",  # Assuming category_id acts as category
+            "boughtInLastMonth": "sales_rank"  # Proxy for sales_rank
         })
 
-        # Adjust sales_rank (in DB, higher boughtInLastMonth is better; in ML, lower sales_rank is better)
+        # Invert sales_rank (higher boughtInLastMonth = better)
         if "sales_rank" in self.product_data.columns:
-            self.product_data["sales_rank"] = 1000000 / (self.product_data["sales_rank"] + 1)  # Invert for ML logic
+            self.product_data["sales_rank"] = 1000000 / (self.product_data["sales_rank"] + 1)
 
         self.cosine_model = None
         self.cluster_model = None
-
-        # Build models on initialization
         self.build_cosine_model()
         self.build_cluster_model()
 
     def preprocess_text(self, text):
-        """Clean and normalize text data"""
         if isinstance(text, str):
-            text = re.sub(r'[^\w\s]', '', text.lower())
-            return text
+            return re.sub(r'[^\w\s]', '', text.lower())
         return ""
 
     def build_cosine_model(self):
-        # [Unchanged from ML code]
         text_features = []
         for _, row in self.product_data.iterrows():
             feature_text = f"{row.get('title', '')} {row.get('category', '')}"
@@ -52,8 +44,7 @@ class AmazonProductRecommender:
                 sales_rank = row.get('sales_rank', 0)
                 if sales_rank > 0:
                     popularity_level = min(10, max(1, int(1000000 / (sales_rank + 1000))))
-                    popularity_text = ' '.join(['bestseller'] * popularity_level)
-                    feature_text += f" {popularity_text}"
+                    feature_text += f" {'bestseller' * popularity_level}"
             if 'rating' in self.product_data.columns and 'review_count' in self.product_data.columns:
                 rating = row.get('rating', 0)
                 review_count = row.get('review_count', 0)
@@ -70,7 +61,6 @@ class AmazonProductRecommender:
         self.cosine_model = True
 
     def build_cluster_model(self, n_clusters=15):
-        # [Simplified version, removing description since it's not in your DB]
         numerical_features = ['price']
         if 'rating' in self.product_data.columns:
             numerical_features.append('rating')
@@ -99,28 +89,7 @@ class AmazonProductRecommender:
         print(f"Cluster model built with {n_clusters} clusters")
         self.cluster_model = True
 
-    def get_recommendations(self, user_input, method='hybrid', top_n=5):
-        # [Unchanged from ML code, using simplified version]
-        if method == 'cosine':
-            return self.get_recommendations_cosine(user_input, top_n)
-        elif method == 'cluster':
-            return self.get_recommendations_cluster(user_input, top_n)
-        else:
-            cosine_recs = self.get_recommendations_cosine(user_input, top_n)
-            cluster_recs = self.get_recommendations_cluster(user_input, top_n)
-            all_recs = cosine_recs + cluster_recs
-            unique_recs = []
-            seen_ids = set()
-            for rec in all_recs:
-                if rec['asin'] not in seen_ids:
-                    unique_recs.append(rec)
-                    seen_ids.add(rec['asin'])
-                    if len(unique_recs) >= top_n:
-                        break
-            return unique_recs
-
     def get_recommendations_cosine(self, query, top_n=5):
-        # [Simplified, removing description]
         if not self.cosine_model:
             self.build_cosine_model()
 
@@ -174,7 +143,6 @@ class AmazonProductRecommender:
         return []
 
     def get_recommendations_cluster(self, query, top_n=5):
-        # [Simplified version]
         if not self.cluster_model:
             self.build_cluster_model()
 
@@ -230,12 +198,31 @@ class AmazonProductRecommender:
         result_fields = ['asin', 'title', 'category', 'price', 'rating', 'review_count', 'sales_rank']
         return recommendations[result_fields].to_dict('records')
 
-# Singleton instance to avoid rebuilding models repeatedly
+    def get_recommendations(self, user_input, method='hybrid', top_n=5):
+        if method == 'cosine':
+            return self.get_recommendations_cosine(user_input, top_n)
+        elif method == 'cluster':
+            return self.get_recommendations_cluster(user_input, top_n)
+        else:
+            cosine_recs = self.get_recommendations_cosine(user_input, top_n)
+            cluster_recs = self.get_recommendations_cluster(user_input, top_n)
+            all_recs = cosine_recs + cluster_recs
+            unique_recs = []
+            seen_ids = set()
+            for rec in all_recs:
+                if rec['asin'] not in seen_ids:
+                    unique_recs.append(rec)
+                    seen_ids.add(rec['asin'])
+                    if len(unique_recs) >= top_n:
+                        break
+            return unique_recs
+
+# Singleton instance
 recommender = AmazonProductRecommender()
 
 def get_recommendations(query_params):
     """
-    Wrapper function for API integration
+    Wrapper for API integration
     Args:
         query_params (dict): From API (e.g., {"keywords": "running shoes", "price": 100.0})
     Returns:
