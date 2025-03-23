@@ -1,29 +1,37 @@
 import streamlit as st
 import requests
 
-# Title
-st.title("Product Recommendation System")
+# FastAPI backend URL
+API_URL = "http://127.0.0.1:8000/recommend"  # Update if deployed elsewhere
 
-# User Input Field
-query = st.text_input("Enter your preference (e.g., 'running shoes under $100'): ")
+# Streamlit UI
+def main():
+    st.title("AI-Powered Product Recommendation Engine")
+    st.write("Enter your preferences to get personalized product recommendations.")
 
-# Submit Button
-if st.button("Get Recommendations"):
-    if query:
-        try:
-            # Replace 'http://127.0.0.1:5000/recommend' with the actual API endpoint from the Backend Developer
-            response = requests.get(f"http://127.0.0.1:8000/recommend?query={query}")
+    # User input
+    user_query = st.text_input("Search for products (e.g., 'running shoes under $100'):")
+    size = st.selectbox("Select size (optional):", ["Any", "7", "8", "9", "10", "11"])  # Example sizes
+
+    # Submit button
+    if st.button("Get Recommendations"):
+        if user_query:
+            payload = {"query": user_query, "size": size if size != "Any" else None}
+            response = requests.post(API_URL, json=payload)
+            
             if response.status_code == 200:
-                data = response.json()
-                if data["recommendations"]:
-                    st.write("### Recommended Products:")
-                    for product in data["recommendations"]:
-                        st.write(f"- **{product['name']}** - ${product['price']}")
+                recommendations = response.json().get("recommendations", [])
+                
+                if recommendations:
+                    st.subheader("Recommended Products:")
+                    for product in recommendations:
+                        st.write(f"- **{product['name']}** (Category: {product['category']}, Price: ${product['price']})")
                 else:
-                    st.write("No recommendations found. Try another query.")
+                    st.write("No recommendations found. Try a different query!")
             else:
-                st.error("Error fetching recommendations from the backend.")
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-    else:
-        st.warning("Please enter a query before submitting.")
+                st.error("Error fetching recommendations. Please check backend connection.")
+        else:
+            st.warning("Please enter a search query.")
+
+if __name__ == "__main__":
+    main()
