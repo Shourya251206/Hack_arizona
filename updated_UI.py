@@ -1,13 +1,10 @@
 import streamlit as st
 import requests
-from PIL import Image
-import io
-import pandas as pd
 
-# Configure page layout and theme colors
+# Configure page
 st.set_page_config(page_title="Product Recommendations", layout="wide")
 
-# Custom CSS for the blue, white, and red theme
+# Custom CSS
 st.markdown("""
 <style>
     .main {
@@ -17,7 +14,8 @@ st.markdown("""
         background-color: #1e3d59 !important;
         color: white !important;
     }
-    .stTextInput > div > div > input {
+    .stTextInput > div > div > input,
+    .stNumberInput > div > input {
         border: 2px solid #1e3d59;
     }
     h1, h2, h3 {
@@ -42,100 +40,76 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# App title and description
+# Header
 st.markdown("<h1 style='text-align: center; color: #1e3d59;'>Smart Product Recommendations</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #1e3d59;'>Find the perfect products based on your preferences</p>", unsafe_allow_html=True)
 
-# Container for the main content
-main_container = st.container()
+# Inputs
+col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+with col1:
+    keywords = st.text_input("Enter keywords (e.g., 'running shoes')")
+with col2:
+    price = st.number_input("Maximum price", min_value=0.0, value=0.0, step=5.0)
+with col3:
+    stars = st.slider("Minimum star rating", min_value=0.0, max_value=5.0, value=0.0, step=0.5)
+with col4:
+    search_button = st.button("Get Recommendations", use_container_width=True)
 
-with main_container:
-    # First row: Input and button
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        user_query = st.text_input("What are you looking for?", 
-                                  placeholder="E.g., running shoes under $100, wireless earbuds with noise cancellation...")
-    
-    with col2:
-        search_button = st.button("Find Products", use_container_width=True)
+# Backend call
+def get_recommendations(query_params):
+    try:
+        response = requests.post("http://127.0.0.1:8000/recommend", json=query_params)
+        return response.json()
+    except Exception as e:
+        st.error(f"Error fetching recommendations: {e}")
+        return {"recommendations": []}
 
-    # Function to call the backend API
-    def get_recommendations(query):
-        # In a real app, this would call your backend API
-        # For demo purposes, we'll generate mock data
-        try:
-            # Replace with actual API endpoint
-            # response = requests.post("http://your-backend-api/recommendations", 
-            #                        json={"query": query})
-            # return response.json()
-            
-            # Mock data for demonstration
-            return {
-                "recommendations": [
-                    {
-                        "name": f"Product for {query} - Option 1",
-                        "price": "$89.99",
-                        "description": "High-quality product that matches your requirements perfectly with excellent customer reviews.",
-                        "rating": 4.7,
-                        "image_url": "https://via.placeholder.com/150",
-                        "product_url": "https://example.com/product1"
-                    },
-                    {
-                        "name": f"Product for {query} - Option 2",
-                        "price": "$94.99",
-                        "description": "Great value option with slightly different features but still meeting your core requirements.",
-                        "rating": 4.5,
-                        "image_url": "https://via.placeholder.com/150",
-                        "product_url": "https://example.com/product2"
-                    },
-                    {
-                        "name": f"Premium {query}",
-                        "price": "$99.99",
-                        "description": "Premium version with additional features and longer warranty, still within your budget.",
-                        "rating": 4.8,
-                        "image_url": "https://via.placeholder.com/150",
-                        "product_url": "https://example.com/product3"
-                    }
-                ]
-            }
-        except Exception as e:
-            st.error(f"Error fetching recommendations: {e}")
-            return {"recommendations": []}
+# Display results
+if search_button and keywords:
+    query_params = {}
+    if keywords:
+        query_params["keywords"] = keywords
+    if price > 0:
+        query_params["price"] = price
+    if stars > 0:
+        query_params["stars"] = stars
 
-    # Display recommendations when the button is clicked
-    if search_button and user_query:
-        with st.spinner('Finding the best products for you...'):
-            result = get_recommendations(user_query)
-            
-            if result["recommendations"]:
-                st.markdown("<div class='recommendation-header'><h2 style='text-align: center; margin: 0;'>Recommended Products</h2></div>", unsafe_allow_html=True)
-                
-                # Display each recommendation in a card format
-                for i, rec in enumerate(result["recommendations"]):
-                    with st.container():
-                        st.markdown(f"<div class='product-card'>", unsafe_allow_html=True)
-                        cols = st.columns([1, 3])
-                        
-                        with cols[0]:
-                            # Display image
-                            st.image(rec["image_url"], width=150)
-                            
-                        with cols[1]:
-                            # Product details
-                            st.markdown(f"<h3>{rec['name']}</h3>", unsafe_allow_html=True)
-                            st.markdown(f"<p><strong>Price:</strong> {rec['price']}</p>", unsafe_allow_html=True)
-                            st.markdown(f"<p><strong>Rating:</strong> {'⭐' * int(rec['rating'])} ({rec['rating']})</p>", unsafe_allow_html=True)
-                            st.markdown(f"<p>{rec['description']}</p>", unsafe_allow_html=True)
-                            st.markdown(f"<a href='{rec['product_url']}' target='_blank'>View Product</a>", unsafe_allow_html=True)
-                        
-                        st.markdown("</div>", unsafe_allow_html=True)
-            else:
-                st.info("No products found matching your query. Try a different search term.")
-    
-    # Show a hint when the app first loads
-    if not search_button:
-        st.info("Enter your product preferences above and click 'Find Products' to get personalized recommendations.")
+    if price == 0:
+        st.warning("You can't buy products for free! Please set a maximum price greater than 0.")
+    else:
+        with st.spinner("Finding the best products for you..."):
+            result = get_recommendations(query_params)
+
+        if result.get("recommendations"):
+            st.markdown("<div class='recommendation-header'><h2 style='text-align: center;'>Recommended Products</h2></div>", unsafe_allow_html=True)
+
+            for product in result["recommendations"]:
+                st.markdown("<div class='product-card'>", unsafe_allow_html=True)
+                cols = st.columns([1, 3])
+
+                with cols[0]:
+                    img_url = product.get("imgURL", "")
+                    if img_url and img_url.startswith("http"):
+                        st.image(img_url, width=140)
+                    else:
+                        st.image("https://via.placeholder.com/150", width=140)
+
+                with cols[1]:
+                    title = product.get("title", "Unnamed Product")
+                    product_url = f"https://www.amazon.com/s?k={title.replace(' ', '+')}"
+
+                    st.markdown(f"<h3><a href='{product_url}' target='_blank' style='text-decoration:none; color:#1e3d59;'>{title}</a></h3>", unsafe_allow_html=True)
+                    st.markdown(f"<p><strong>Price:</strong> ${product['price']:.2f}</p>", unsafe_allow_html=True)
+                    if "rating" in product:
+                        st.markdown(f"<p><strong>Rating:</strong> {'⭐' * int(product['rating'])} ({product['rating']:.1f})</p>", unsafe_allow_html=True)
+                    if "category" in product:
+                        st.markdown(f"<p><strong>Category:</strong> {product['category']}</p>", unsafe_allow_html=True)
+
+                st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.info("No recommendations found. Try different criteria.")
+else:
+    st.info("Enter product keywords and click 'Get Recommendations'.")
 
 # Footer
 st.markdown("""
@@ -143,3 +117,4 @@ st.markdown("""
     <p>© 2025 Product Recommendation System | All Rights Reserved</p>
 </div>
 """, unsafe_allow_html=True)
+
