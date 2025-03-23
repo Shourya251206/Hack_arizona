@@ -1,133 +1,149 @@
 import streamlit as st
 import requests
-import speech_recognition as sr  # Added for voice-to-text
+import speech_recognition as sr
 
 # Configure page
-st.set_page_config(page_title="Product Recommendation System", layout="wide")
+st.set_page_config(page_title="Product Recommendations", layout="wide")
 
-# Custom CSS for styling the mic button
+# Custom CSS
 st.markdown("""
 <style>
-    button[kind="mic_button"] {
-        background-color: #1e3d59 !important;  /* Dark blue background */
-        color: white !important;              /* White mic icon */
-        font-size: 24px !important;
-        padding: 5px 10px !important;
-        border: none !important;
-        border-radius: 5px !important;
-        margin-left: 10px !important;
-        cursor: pointer !important;
+    .main {
+        background-color: #f0f2f6;
     }
-    button[kind="mic_button"]:hover {
-        background-color: #355d82 !important; /* Lighter blue on hover */
+    .stButton button {
+        background-color: #1e3d59 !important;
+        color: white !important;
+    }
+    .stTextInput > div > div > input,
+    .stNumberInput > div > input {
+        border: 2px solid #1e3d59;
+    }
+    h1, h2, h3 {
+        color: #1e3d59;
+    }
+    .product-card {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        border-top: 4px solid #1e3d59;
+        border-bottom: 4px solid #ff6b6b;
+    }
+    .recommendation-header {
+        background-color: #1e3d59;
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Title
-st.title("Product Recommendation System")
+# Header
+st.markdown("<h1 style='text-align: center; color: #1e3d59;'>Smart Product Recommendations</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #1e3d59;'>Find the perfect products based on your preferences</p>", unsafe_allow_html=True)
 
 # Voice-to-text function
-def voice_to_text():
+def recognize_speech():
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
-        st.info("Listening... Speak your keywords!")
-        audio = recognizer.listen(source)
+        st.info("Listening...")
         try:
+            audio = recognizer.listen(source, timeout=5)
             text = recognizer.recognize_google(audio)
-            st.success("Heard: " + text)
             return text
         except sr.UnknownValueError:
-            st.error("Sorry, I couldn't understand that.")
-            return ""
+            st.warning("Could not understand the audio. Please try again.")
         except sr.RequestError:
-            st.error("Speech recognition service unavailable.")
-            return ""
+            st.warning("Speech Recognition service is unavailable.")
+    return ""
 
-# User Input Fields
-keywords = st.text_input("Enter keywords (e.g., 'running shoes')", "")
-if st.button("🎤", key="mic_button"):
-    keywords = voice_to_text()
-    st.session_state["keywords"] = keywords  # Update the input field
+# Inputs
+col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
+with col1:
+    keywords = st.text_input("Enter keywords (e.g., 'running shoes')")
+    if st.button("🎤", key="mic_button"):
+        spoken_text = recognize_speech()
+        if spoken_text:
+            st.session_state["keywords"] = spoken_text
+            keywords = spoken_text
 
-price = st.number_input("Maximum price (optional)", min_value=0.0, value=0.0, step=10.0)
-stars = st.slider("Minimum star rating (optional)", min_value=0.0, max_value=5.0, value=0.0, step=0.5)
+with col2:
+    price = st.number_input("Maximum price", min_value=0.0, value=0.0, step=5.0)
+with col3:
+    stars = st.slider("Minimum star rating", min_value=0.0, max_value=5.0, value=0.0, step=0.5)
+with col4:
+    sort_order = st.selectbox("Sort by Price", ["None", "Low to High", "High to Low"])
+with col5:
+    search_button = st.button("Get Recommendations", use_container_width=True)
 
-# Submit Button
-if st.button("Get Recommendations"):
-    # Prepare query parameters (only include non-default values)
+# Backend call
+def get_recommendations(query_params):
+    try:
+        response = requests.post("http://127.0.0.1:8000/recommend", json=query_params)
+        return response.json()
+    except Exception as e:
+        st.error(f"Error fetching recommendations: {e}")
+        return {"recommendations": []}
+
+# Display results
+if search_button and keywords:
     query_params = {}
     if keywords:
         query_params["keywords"] = keywords
-    if price > 0:  # Only include if user sets a value greater than 0
+    if price > 0:
         query_params["price"] = price
-    if stars > 0:  # Only include if user sets a minimum
+    if stars > 0:
         query_params["stars"] = stars
 
-    # Check if price is 0 before proceeding
-    if price == 0 and not keywords and not stars:
-        st.warning("You can't buy products for free! Please set a maximum price greater than 0 or enter keywords/stars.")
-    elif query_params:  # Proceed only if there are valid parameters
-        try:
-            # Send POST request to backend
-            response = requests.post(
-                "http://127.0.0.1:8000/recommend",
-                json=query_params
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if data["recommendations"]:
-                    st.write("### Recommended Products:")
-                    
-                    # Sorting options (replacing "filter button")
-                    sort_option = st.selectbox(
-                        "Sort by price:",
-                        ["Default", "Low to High", "High to Low"],
-                        key="sort_select"
-                    )
-                    
-                    # Sort recommendations based on selection
-                    recommendations = data["recommendations"]
-                    if sort_option == "Low to High":
-                        recommendations = sorted(recommendations, key=lambda x: float(x["price"]))
-                    elif sort_option == "High to Low":
-                        recommendations = sorted(recommendations, key=lambda x: float(x["price"]), reverse=True)
-
-                    for product in recommendations:
-                        st.markdown("----")
-                        cols = st.columns([1, 3])  # Left for image, right for details
-
-                        with cols[0]:
-                            if product.get("imgURL"):
-                                st.image(product["imgURL"], width=120)
-
-                        with cols[1]:
-                            title = product.get("title", "Unnamed Product")
-                            product_url = f"https://www.amazon.com/s?k={title.replace(' ', '+')}"
-
-                            if product_url and product_url.startswith("http"):
-                                st.markdown(f'<a href="{product_url}" target="_blank"><strong>{title}</strong></a>', unsafe_allow_html=True)
-                            else:
-                                st.markdown(f"**{title}**")
-
-                            # Handle price with error checking
-                            raw_price = product.get("price", "N/A")
-                            try:
-                                price_value = float(raw_price)
-                                st.write(f"${price_value:.2f}")
-                            except (ValueError, TypeError):
-                                st.write(f"Price: {raw_price} (Invalid format)")
-
-                            if "rating" in product:
-                                st.write(f"Rating: {product['rating']} ★ ({product.get('review_count', 0)} reviews)")
-                            if "category" in product:
-                                st.write(f"Category: {product['category']}")
-
-                else:
-                    st.write("No recommendations found. Try adjusting your query.")
-            else:
-                st.error(f"Error fetching recommendations: {response.status_code} - {response.text}")
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
+    if price == 0:
+        st.warning("You can't buy products for free! Please set a maximum price greater than 0.")
     else:
-        st.warning("Please enter at least one preference (keywords, price, or stars).")
+        with st.spinner("Finding the best products for you..."):
+            result = get_recommendations(query_params)
+
+        if result.get("recommendations"):
+            # Sorting logic
+            if sort_order == "Low to High":
+                result["recommendations"].sort(key=lambda x: x["price"])
+            elif sort_order == "High to Low":
+                result["recommendations"].sort(key=lambda x: x["price"], reverse=True)
+
+            st.markdown("<div class='recommendation-header'><h2 style='text-align: center;'>Recommended Products</h2></div>", unsafe_allow_html=True)
+            for product in result["recommendations"]:
+                st.markdown("<div class='product-card'>", unsafe_allow_html=True)
+                cols = st.columns([1, 3])
+                with cols[0]:
+                    img_url = product.get("imgURL", "")
+                    try:
+                        if img_url and img_url.startswith("http"):
+                            st.image(img_url, width=140)
+                        else:
+                            raise Exception("Invalid or missing image URL")
+                    except:
+                        st.image("https://via.placeholder.com/150?text=No+Image", width=140)
+
+                with cols[1]:
+                    title = product.get("title", "Unnamed Product")
+                    product_url = f"https://www.amazon.com/s?k={title.replace(' ', '+')}"
+
+                    st.markdown(f"<h3><a href='{product_url}' target='_blank' style='text-decoration:none; color:#1e3d59;'>{title}</a></h3>", unsafe_allow_html=True)
+                    st.markdown(f"<p><strong>Price:</strong> ${product['price']:.2f}</p>", unsafe_allow_html=True)
+                    if "rating" in product:
+                        st.markdown(f"<p><strong>Rating:</strong> {'⭐' * int(product['rating'])} ({product['rating']:.1f})</p>", unsafe_allow_html=True)
+                    if "category" in product:
+                        st.markdown(f"<p><strong>Category:</strong> {product['category']}</p>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.info("No recommendations found. Try different criteria.")
+else:
+    st.info("Enter product keywords and click 'Get Recommendations'.")
+
+# Footer
+st.markdown("""
+<div style='text-align: center; margin-top: 50px; padding: 20px; color: #666;'>
+    <p>© 2025 Product Recommendation System | All Rights Reserved</p>
+</div>
+""", unsafe_allow_html=True)
