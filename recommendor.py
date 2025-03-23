@@ -4,14 +4,45 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
-import re
-import random
+import speech_recognition as sr
+import nltk
+from nltk.tokenize import word_tokenize
 import time
+import sqlite3
 from collections import defaultdict
 
-# QueryGenerator class remains unchanged
+# Download NLTK data if needed
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+
+class VoiceQueryHandler:
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        
+    def listen_for_query(self):
+        """Record audio from microphone and convert to text"""
+        with sr.Microphone() as source:
+            print("Listening for your query... Speak now")
+            # Adjust for ambient noise
+            self.recognizer.adjust_for_ambient_noise(source, duration=1)
+            # Record audio
+            audio = self.recognizer.listen(source)
+            
+        try:
+            # Recognize speech using Google Speech Recognition
+            query = self.recognizer.recognize_google(audio)
+            print(f"You said: {query}")
+            return query
+        except sr.UnknownValueError:
+            print("Sorry, I couldn't understand your query. Please try again.")
+            return None
+        except sr.RequestError as e:
+            print(f"Could not request results from speech recognition service; {e}")
+            return None
+
 class QueryGenerator:
-    # [Previous QueryGenerator implementation remains the same]
     def __init__(self, product_data):
         self.product_data = product_data
         self.categories = self.extract_categories()
@@ -55,6 +86,7 @@ class QueryGenerator:
         self.brands = self.extract_brands()
         self.product_mapping = self.build_product_mapping()
         
+    # Other methods remain the same as in your original code
     def extract_categories(self):
         if 'category' in self.product_data.columns:
             all_categories = self.product_data['category'].dropna().unique().tolist()
@@ -105,6 +137,7 @@ class QueryGenerator:
         return mapping
     
     def generate_query(self):
+        # Implementation unchanged from original code
         template = random.choice(self.query_templates)
         if "{category}" in template:
             category = random.choice(self.categories)
@@ -145,13 +178,37 @@ class QueryGenerator:
         return list(queries)
 
 class AmazonProductRecommender:
-    def __init__(self, amazon_data):
-        self.product_data = amazon_data
+    def __init__(self, amazon_data, use_db=False, db_path=None):
+        self.use_db = use_db
+        self.db_path = db_path
+        if use_db and db_path:
+            self.product_data = self.load_from_db()
+        else:
+            self.product_data = amazon_data
+        self.voice_handler = VoiceQueryHandler()
         self.cosine_model = None
         self.cluster_model = None
         self.tfidf_vectorizer = None
         self.tfidf_matrix = None
-        self.query_generator = QueryGenerator(amazon_data)
+        self.query_generator = QueryGenerator(self.product_data)
+    
+    def load_from_db(self):
+        """Load product data from SQLite database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            df = pd.read_sql_query("SELECT * FROM products", conn)
+            conn.close()
+            return df
+        except Exception as e:
+            print(f"Database error: {e}")
+            return pd.DataFrame()
+    
+    def preprocess_query(self, query):
+        """Tokenize and normalize user query"""
+        if not query:
+            return ""
+        tokens = word_tokenize(query.lower())
+        return " ".join(tokens)
 
     def build_cosine_model(self):
         print("Building cosine similarity model...")
@@ -188,6 +245,12 @@ class AmazonProductRecommender:
 
     def get_recommendations(self, query, method='cosine', n=5):
         """Get product recommendations for a given query"""
+        # Preprocess query
+        processed_query = self.preprocess_query(query)
+        
+        if not processed_query:
+            return []
+            
         if method == 'cosine' and self.cosine_model is None:
             self.build_cosine_model()
         if method == 'cluster' and self.cluster_model is None:
@@ -195,7 +258,7 @@ class AmazonProductRecommender:
 
         if method == 'cosine' or method == 'hybrid':
             # Transform query to TF-IDF space
-            query_vec = self.tfidf_vectorizer.transform([query])
+            query_vec = self.tfidf_vectorizer.transform([processed_query])
             similarities = cosine_similarity(query_vec, self.tfidf_matrix)[0]
             
             # Get top similar products
@@ -209,6 +272,9 @@ class AmazonProductRecommender:
                         'title': self.product_data.iloc[idx]['title'],
                         'price': float(self.product_data.iloc[idx]['price'])
                     }
+                    # Add image if available
+                    if 'product_image' in self.product_data.columns:
+                        rec['image'] = self.product_data.iloc[idx]['product_image']
                     recommendations.append(rec)
             
             if method == 'hybrid' and self.cluster_model is not None:
@@ -227,7 +293,7 @@ class AmazonProductRecommender:
                 return []
             
             # Transform query to TF-IDF space
-            query_vec = self.tfidf_vectorizer.transform([query])
+            query_vec = self.tfidf_vectorizer.transform([processed_query])
             cluster_pred = self.cluster_model.predict(query_vec)[0]
             
             # Get products from the same cluster
@@ -236,118 +302,46 @@ class AmazonProductRecommender:
                     for _, row in cluster_products.sample(min(n, len(cluster_products))).iterrows()]
 
         return []
+    
+    def get_voice_recommendations(self, method='hybrid', n=5):
+        """Listen for voice query and return recommendations"""
+        query = self.voice_handler.listen_for_query()
+        if query:
+            return self.get_recommendations(query, method=method, n=n)
+        return []
+    
+    def interactive_voice_mode(self):
+        """Run an interactive session with voice input"""
+        print("=== Voice Recommendation Mode ===")
+        print("Say 'exit' or 'quit' to end the session")
+        
+        while True:
+            print("\nListening for your query...")
+            query = self.voice_handler.listen_for_query()
+            
+            if not query:
+                print("I didn't catch that. Please try again.")
+                continue
+                
+            if query.lower() in ['exit', 'quit', 'stop', 'end']:
+                print("Ending voice session. Goodbye!")
+                break
+                
+            print(f"Finding recommendations for: '{query}'")
+            recommendations = self.get_recommendations(query, method='hybrid')
+            
+            if recommendations:
+                print(f"\nHere are {len(recommendations)} recommendations for you:")
+                for i, rec in enumerate(recommendations):
+                    print(f"{i+1}. {rec['title']} - ${rec['price']:.2f}")
+            else:
+                print("Sorry, I couldn't find any relevant products. Please try a different query.")
+                
+            time.sleep(1)  # Brief pause before listening again
 
-    def evaluate_model(self, n_queries=100, methods=['cosine', 'cluster', 'hybrid']):
-        print(f"Evaluating recommendation model on {n_queries} random queries...")
-        test_queries = self.query_generator.generate_queries(n_queries)
-        results = {'queries': test_queries, 'recommendations': {}, 'stats': {}}
-        
-        for method in methods:
-            results['recommendations'][method] = []
-            results['stats'][method] = {'avg_recommendations': 0, 'query_success_rate': 0, 'avg_time': 0}
-        
-        for method in methods:
-            total_recs = 0
-            successful_queries = 0
-            total_time = 0
-            
-            for query in test_queries:
-                start_time = time.time()
-                recs = self.get_recommendations(query, method=method)
-                elapsed_time = time.time() - start_time
-                
-                results['recommendations'][method].append({
-                    'query': query,
-                    'results': recs,
-                    'time': elapsed_time
-                })
-                
-                total_time += elapsed_time
-                if recs:
-                    successful_queries += 1
-                    total_recs += len(recs)
-            
-            results['stats'][method]['avg_recommendations'] = total_recs / n_queries
-            results['stats'][method]['query_success_rate'] = successful_queries / n_queries
-            results['stats'][method]['avg_time'] = total_time / n_queries
-            
-        return results
-
-    def run_comprehensive_tests(self, queries_per_type=10):
-        query_types = {
-            'basic': ["{category}"],
-            'price_filtered': ["{category} under ${price}", "affordable {category}"],
-            'bestseller': ["bestselling {category}", "popular {category}"],
-            'rating': ["top rated {category}", "highly rated {category}", "{category} with good reviews"],
-            'specific_features': ["{adjective} {category}", "{color} {category}"],
-            'brand_specific': ["{brand} {category}", "alternatives to {brand} {category}"],
-            'complex': ["bestselling {category} under ${price}", "{category} between ${price_min} and ${price_max}"]
-        }
-        
-        results = {}
-        original_templates = self.query_generator.query_templates
-        
-        for query_type, templates in query_types.items():
-            print(f"Testing {query_type} queries...")
-            self.query_generator.query_templates = templates
-            type_queries = self.query_generator.generate_queries(queries_per_type)
-            
-            type_results = {'queries': type_queries, 'cosine': [], 'cluster': [], 'hybrid': []}
-            
-            for query in type_queries:
-                for method in ['cosine', 'cluster', 'hybrid']:
-                    recs = self.get_recommendations(query, method=method)
-                    type_results[method].append({'query': query, 'count': len(recs), 'results': recs})
-            
-            results[query_type] = type_results
-        
-        self.query_generator.query_templates = original_templates
-        return results
-
-    def batch_test_and_save(self, output_file='recommendation_test_results.csv', n_queries=500):
-        print(f"Running batch test on {n_queries} queries...")
-        test_queries = self.query_generator.generate_queries(n_queries)
-        results = []
-        
-        for i, query in enumerate(test_queries):
-            if i % 50 == 0:
-                print(f"Processing query {i+1}/{n_queries}...")
-                
-            for method in ['cosine', 'cluster', 'hybrid']:
-                start_time = time.time()
-                recs = self.get_recommendations(query, method=method)
-                elapsed_time = time.time() - start_time
-                
-                result = {
-                    'query': query,
-                    'method': method,
-                    'num_results': len(recs),
-                    'processing_time': elapsed_time,
-                    'success': len(recs) > 0
-                }
-                
-                if recs:
-                    result.update({
-                        'first_result_asin': recs[0].get('asin', ''),
-                        'first_result_title': recs[0].get('title', ''),
-                        'first_result_price': recs[0].get('price', 0)
-                    })
-                else:
-                    result.update({
-                        'first_result_asin': '',
-                        'first_result_title': '',
-                        'first_result_price': 0
-                    })
-                
-                results.append(result)
-        
-        results_df = pd.DataFrame(results)
-        results_df.to_csv(output_file, index=False)
-        print(f"Results saved to {output_file}")
-        return results_df
-
+# Example usage
 if __name__ == "__main__":
-    # Create sample data (replacing load_amazon_data)
+    # Option 1: Use the sample data generation from your original code
     print("Creating sample Amazon data for demonstration.")
     categories = ['Electronics', 'Books', 'Home & Kitchen', 'Clothing', 'Sports & Outdoors', 
                   'Beauty', 'Toys & Games', 'Grocery', 'Pet Supplies', 'Automotive']
@@ -355,6 +349,8 @@ if __name__ == "__main__":
               'Logitech', 'Microsoft', 'Dell', 'HP', 'Anker', 'JBL', 'Canon', 'Nikon']
     
     n_samples = 2000
+    import random
+    
     titles = []
     for _ in range(n_samples):
         brand = random.choice(brands)
@@ -374,51 +370,28 @@ if __name__ == "__main__":
         'sales_rank': np.random.randint(1, 500000, n_samples)
     })
     
-    # Initialize and run recommender
+    # Option 2: Use database
+    # recommender = AmazonProductRecommender(None, use_db=True, db_path="products.db")
+    
+    # Use generated data
     recommender = AmazonProductRecommender(amazon_data)
-    print("Building recommendation models...")
+    
+    # Build models
     recommender.build_cosine_model()
     recommender.build_cluster_model()
     
-    print("\nTesting with generated queries:")
-    generated_queries = recommender.query_generator.generate_queries(5)
-    for query in generated_queries:
-        print(f"\nQuery: {query}")
-        recommendations = recommender.get_recommendations(query, method='hybrid')
-        print("Recommendations:")
-        for i, rec in enumerate(recommendations[:3]):
-            print(f"{i+1}. {rec['title']} - ${rec['price']:.2f}")
+    # Test with text query
+    test_query = "wireless headphones under $100"
+    print(f"\nTesting with text query: '{test_query}'")
+    recs = recommender.get_recommendations(test_query, method='hybrid')
+    print(f"Found {len(recs)} recommendations")
+    for i, rec in enumerate(recs[:3]):
+        print(f"{i+1}. {rec['title']} - ${rec['price']:.2f}")
     
-    print("\nRunning comprehensive evaluation...")
-    eval_results = recommender.evaluate_model(n_queries=20)
-    
-    print("\nModel Evaluation Summary:")
-    for method, stats in eval_results['stats'].items():
-        print(f"\nMethod: {method.upper()}")
-        print(f"Average recommendations per query: {stats['avg_recommendations']:.2f}")
-        print(f"Query success rate: {stats['query_success_rate']*100:.1f}%")
-        print(f"Average processing time: {stats['avg_time']*1000:.2f}ms")
-    
-    print("\nRunning targeted query tests...")
-    type_results = recommender.run_comprehensive_tests(queries_per_type=3)
-    
-    print("\nSuccess Rates by Query Type:")
-    for query_type, results in type_results.items():
-        success_rates = {}
-        for method in ['cosine', 'cluster', 'hybrid']:
-            successful = sum(1 for item in results[method] if item['count'] > 0)
-            success_rates[method] = successful / len(results[method]) * 100
-        print(f"{query_type.capitalize()} Queries:")
-        for method, rate in success_rates.items():
-            print(f"  - {method.capitalize()}: {rate:.1f}%")
-    
-    print("\nRunning large batch test...")
-    batch_results = recommender.batch_test_and_save(n_queries=50)
-    
-    print("\nBatch Test Summary:")
-    method_stats = batch_results.groupby('method').agg({
-        'num_results': 'mean',
-        'processing_time': 'mean',
-        'success': 'mean'
-    })
-    print(method_stats)
+    # Try voice mode (uncomment to test with a microphone)
+    print("\nWould you like to try voice mode? (y/n)")
+    response = input()
+    if response.lower() == 'y':
+        recommender.interactive_voice_mode()
+    else:
+        print("Voice mode skipped. Exiting.")
