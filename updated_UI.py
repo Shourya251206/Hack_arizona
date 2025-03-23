@@ -163,4 +163,28 @@ with col2:
     st.subheader("🛒 Your Cart")
     
     if st.session_state.cart:
-        total = sum(float(item.get('p
+        total = sum(float(item.get('price', 0)) for item in st.session_state.cart)
+        
+        for i, item in enumerate(st.session_state.cart):
+            st.write(f"**{item['name']}** - ${item.get('price', 0)}")
+            st.button("Remove", key=f"remove_{i}", on_click=remove_from_cart, args=(i,))
+            st.write("---")
+        
+        st.write(f"**Total: ${total:.2f}**")
+        if st.button("Clear Cart"):
+            st.session_state.cart = []
+            st.experimental_rerun()
+    else:
+        st.write("Your cart is empty.")
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Search history - WHITE container
+    st.markdown("<div class='white-container'>", unsafe_allow_html=True)
+    st.subheader("🔍 Recent Searches")
+    
+    if st.session_state.search_history:
+        for search in st.session_state.search_history[-5:]:
+            st.write(f"• {search}")
+    else:
+        st.write("No search history yet.")
+    st.markdown("</div>", unsafe_allow_html=True)
