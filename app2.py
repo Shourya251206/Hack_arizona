@@ -1,11 +1,11 @@
 import streamlit as st
 import requests
-import speech_recognition as sr  # Assuming this is part of your voice-to-text code
+import speech_recognition as sr
 
 # Configure page
 st.set_page_config(page_title="Product Recommendations", layout="wide")
 
-# Custom CSS (updated to include mic icon styling and sort dropdown)
+# Custom CSS (updated to make mic icon white)
 st.markdown("""
 <style>
     .main {
@@ -38,11 +38,23 @@ st.markdown("""
         border-radius: 5px;
         margin-bottom: 20px;
     }
-    .mic-icon {
-        cursor: pointer;
-        font-size: 20px;
-        margin-left: 10px;
-        vertical-align: middle;
+    .mic-container {
+        display: flex;
+        align-items: center;
+    }
+    /* Specific styling for the mic button */
+    button[kind="mic_button"] {
+        background-color: #1e3d59 !important;  /* Matches your theme */
+        color: white !important;              /* Makes the mic icon white */
+        font-size: 24px !important;
+        padding: 5px 10px !important;
+        border: none !important;
+        border-radius: 5px !important;
+        margin-left: 10px !important;
+        cursor: pointer !important;
+    }
+    button[kind="mic_button"]:hover {
+        background-color: #355d82 !important; /* Slightly lighter on hover */
     }
     .sort-container {
         display: flex;
@@ -56,7 +68,7 @@ st.markdown("""
 st.markdown("<h1 style='text-align: center; color: #1e3d59;'>Smart Product Recommendations</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #1e3d59;'>Find the perfect products based on your preferences</p>", unsafe_allow_html=True)
 
-# Voice-to-text function (placeholder for your code)
+# Voice-to-text function
 def voice_to_text():
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
@@ -76,13 +88,13 @@ def voice_to_text():
 # Inputs
 col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
 with col1:
-    # Keywords input with mic icon
+    # Keywords input with mic icon in a container
+    st.markdown('<div class="mic-container">', unsafe_allow_html=True)
     keywords = st.text_input("Enter keywords (e.g., 'running shoes')", key="keywords")
-    mic_col, _ = st.columns([1, 5])  # Small column for mic icon
-    with mic_col:
-        if st.button("🎤", key="mic_button"):
-            keywords = voice_to_text()
-            st.session_state["keywords"] = keywords  # Update input field
+    if st.button("🎤", key="mic_button", type="primary"):  # Added type="primary" for consistency
+        keywords = voice_to_text()
+        st.session_state["keywords"] = keywords
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with col2:
     price = st.number_input("Maximum price", min_value=0.0, value=0.0, step=5.0)
@@ -116,6 +128,10 @@ if search_button and keywords:
         with st.spinner("Finding the best products for you..."):
             result = get_recommendations(query_params)
 
+        # Debug raw response
+        with st.expander("Debug: Raw Backend Response"):
+            st.json(result)
+
         if result.get("recommendations"):
             # Sorting options
             st.markdown('<div class="sort-container">', unsafe_allow_html=True)
@@ -127,7 +143,7 @@ if search_button and keywords:
             )
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # Sort the recommendations based on selection
+            # Sort recommendations
             recommendations = result["recommendations"]
             if sort_option == "Low to High":
                 recommendations = sorted(recommendations, key=lambda x: float(x["price"]))
@@ -155,11 +171,26 @@ if search_button and keywords:
                     product_url = f"https://www.amazon.com/s?k={title.replace(' ', '+')}"
 
                     st.markdown(f"<h3><a href='{product_url}' target='_blank' style='text-decoration:none; color:#1e3d59;'>{title}</a></h3>", unsafe_allow_html=True)
-                    st.markdown(f"<p><strong>Price:</strong> ${product['price']:.2f}</p>", unsafe_allow_html=True)
+                    
+                    # Handle price with error checking
+                    raw_price = product.get("price", "N/A")
+                    try:
+                        price_value = float(raw_price)
+                        st.markdown(f"<p><strong>Price:</strong> ${price_value:.2f}</p>", unsafe_allow_html=True)
+                    except (ValueError, TypeError):
+                        st.markdown(f"<p><strong>Price:</strong> {raw_price} (Invalid format)</p>", unsafe_allow_html=True)
+                    
+                    # Handle rating
                     if "rating" in product:
-                        st.markdown(f"<p><strong>Rating:</strong> {'⭐' * int(product['rating'])} ({product['rating']:.1f})</p>", unsafe_allow_html=True)
-                    if "category" in product:
-                        st.markdown(f"<p><strong>Category:</strong> {product['category']}</p>", unsafe_allow_html=True)
+                        try:
+                            rating = float(product["rating"])
+                            st.markdown(f"<p><strong>Rating:</strong> {'⭐' * int(rating)} ({rating:.1f})</p>", unsafe_allow_html=True)
+                        except (ValueError, TypeError):
+                            st.markdown(f"<p><strong>Rating:</strong> {product['rating']} (Invalid format)</p>", unsafe_allow_html=True)
+                    
+                    # Handle category
+                    category = product.get("category", "Not specified")
+                    st.markdown(f"<p><strong>Category:</strong> {category}</p>", unsafe_allow_html=True)
 
                 st.markdown("</div>", unsafe_allow_html=True)
         else:
