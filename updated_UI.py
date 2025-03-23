@@ -1,82 +1,71 @@
 import streamlit as st
 import requests
-import json
 
-# Initialize session state if not already set
-if 'cart' not in st.session_state:
-    st.session_state.cart = []
-if 'search_history' not in st.session_state:
-    st.session_state.search_history = []
-
-# Function to fetch recommendations from backend API
-def get_recommendations(query):
-    api_url = f"http://127.0.0.1:8000/recommend?query={query}"
+def get_product_recommendations(query):
+    url = "https://your-backend-api.com/recommend"
+    params = {"query": query}
     try:
-        response = requests.get(api_url, timeout=5)
+        response = requests.get(url, params=params)
         response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        st.error(f"Failed to fetch recommendations: {e}")
+        return response.json().get("products", [])
+    except requests.exceptions.RequestException:
         return []
 
-# Function to add item to cart
-def add_to_cart(product):
-    st.session_state.cart.append(product)
-    st.success(f"{product['name']} added to cart!")
+st.set_page_config(page_title="Product Finder", layout="wide")
+st.markdown("""
+    <style>
+        .stApp {
+            background-color: #1C39BB; /* Persian Blue */
+        }
+        .search-bar {
+            background-color: red;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .product-card {
+            background-color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-# Function to remove item from cart
-def remove_from_cart(index):
-    removed_item = st.session_state.cart.pop(index)
-    st.success(f"Removed {removed_item['name']} from cart")
+# Sidebar: Cart and Search History
+with st.sidebar:
+    st.title("🛒 Shopping Cart")
+    cart = st.session_state.get("cart", [])
+    for item in cart:
+        st.write(f"- {item}")
+    st.title("🔍 Search History")
+    search_history = st.session_state.get("search_history", [])
+    for query in search_history:
+        st.write(f"- {query}")
 
-# UI Elements
-st.title("🛍️ Smart Product Recommender")
+# Main Content
+st.markdown("<div class='search-bar'>", unsafe_allow_html=True)
+query = st.text_input("Search for a product:", key="search_input")
+st.markdown("</div>", unsafe_allow_html=True)
 
-# Search input
-query = st.text_input("Enter a product name or keyword:", "")
+if st.button("Search"):
+    if query:
+        recommendations = get_product_recommendations(query)
+        if "search_history" not in st.session_state:
+            st.session_state["search_history"] = []
+        st.session_state["search_history"].append(query)
 
-# Filters
-category = st.selectbox("Filter by Category:", ["All", "Electronics", "Fashion", "Books", "Home Appliances"])
-price_range = st.slider("Filter by Price Range ($):", 0, 500, (0, 500))
-
-if st.button("Search") and query:
-    st.session_state.search_history.append(query)
-    recommendations = get_recommendations(query)
-    
-    if recommendations:
-        st.subheader("Recommended Products")
-        cols = st.columns(2)  # Two-column layout
-        
-        for index, product in enumerate(recommendations):
-            try:
-                price = float(product.get('price', 0))
-            except ValueError:
-                price = 0
-            
-            # Apply filters
-            if category != "All" and product.get('category') != category:
-                continue
-            if not (price_range[0] <= price <= price_range[1]):
-                continue
-            
-            with cols[index % 2]:
-                st.image(product.get('image_url', 'https://via.placeholder.com/150'), width=150)
-                st.write(f"**{product['name']}**")
-                st.write(f"💲{price}")
-                st.button("Add to Cart", key=f"cart_{index}", on_click=add_to_cart, args=(product,))
-    else:
-        st.warning("No recommendations found!")
-
-# Sidebar: Shopping Cart
-st.sidebar.title("🛒 Your Cart")
-if st.session_state.cart:
-    for i, item in enumerate(st.session_state.cart):
-        st.sidebar.write(f"- {item['name']} - 💲{item.get('price', 0)}")
-        st.sidebar.button("Remove", key=f"remove_{i}", on_click=remove_from_cart, args=(i,))
-else:
-    st.sidebar.write("Your cart is empty.")
-
-# Sidebar: Search History
-st.sidebar.title("🔍 Search History")
-for hist in st.session_state.search_history[-5:]:
-    st.sidebar.write(f"- {hist}")
+        if recommendations:
+            st.subheader("Recommended Products:")
+            col1, col2 = st.columns(2)
+            for index, product in enumerate(recommendations):
+                with (col1 if index % 2 == 0 else col2):
+                    st.markdown(f"""
+                        <div class='product-card'>
+                            <h4>{product['name']}</h4>
+                            <p>Price: ${product['price']}</p>
+                            <button onclick="st.session_state['cart'].append('{product['name']}')">Add to Cart</button>
+                        </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.error("No products found. Try another search!")
