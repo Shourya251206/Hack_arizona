@@ -1,108 +1,145 @@
 import streamlit as st
 import requests
-from ml_module import get_recommendations
+from PIL import Image
+import io
+import pandas as pd
 
-# Custom CSS for Styling
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-color: #ffffff;
-        color: #0d47a1;
+# Configure page layout and theme colors
+st.set_page_config(page_title="Product Recommendations", layout="wide")
+
+# Custom CSS for the blue, white, and red theme
+st.markdown("""
+<style>
+    .main {
+        background-color: #f0f2f6;
     }
-    .stTextInput, .stNumberInput, .stSlider {
-        background-color: #f5f5f5;
-        border-radius: 5px;
+    .stButton button {
+        background-color: #1e3d59 !important;
+        color: white !important;
     }
-    .stButton>button {
-        background-color: #d32f2f;
-        color: white;
-        border-radius: 5px;
-        font-weight: bold;
-        padding: 8px 15px;
+    .stTextInput > div > div > input {
+        border: 2px solid #1e3d59;
     }
-    .stButton>button:hover {
-        background-color: #b71c1c;
+    h1, h2, h3 {
+        color: #1e3d59;
     }
     .product-card {
-        background-color: #ffffff;
-        padding: 15px;
-        margin: 10px 0;
+        background-color: white;
         border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0, 0, 255, 0.2);
-        border: 2px solid #d32f2f;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        border-top: 4px solid #1e3d59;
+        border-bottom: 4px solid #ff6b6b;
     }
-    .product-image {
-        width: 120px;
-        height: auto;
+    .recommendation-header {
+        background-color: #1e3d59;
+        color: white;
+        padding: 10px;
         border-radius: 5px;
-        border: 2px solid #0d47a1;
+        margin-bottom: 20px;
     }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+</style>
+""", unsafe_allow_html=True)
 
-# Title
-st.title("Product Recommendation System")
+# App title and description
+st.markdown("<h1 style='text-align: center; color: #1e3d59;'>Smart Product Recommendations</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #1e3d59;'>Find the perfect products based on your preferences</p>", unsafe_allow_html=True)
 
-# User Input Fields
-keywords = st.text_input("Enter keywords (e.g., 'running shoes')", "")
-price = st.number_input("Maximum price (optional)", min_value=0.0, value=0.0, step=10.0)
-stars = st.slider("Minimum star rating (optional)", min_value=0.0, max_value=5.0, value=0.0, step=0.5)
+# Container for the main content
+main_container = st.container()
 
-# Submit Button
-if st.button("Get Recommendations"):
-    # Prepare query parameters (only include non-default values)
-    query_params = {}
-    if keywords:
-        query_params["keywords"] = keywords
-    if price > 0:  # Only include if user sets a value greater than 0
-        query_params["price"] = price
-    if stars > 0:  # Only include if user sets a minimum
-        query_params["stars"] = stars
+with main_container:
+    # First row: Input and button
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        user_query = st.text_input("What are you looking for?", 
+                                  placeholder="E.g., running shoes under $100, wireless earbuds with noise cancellation...")
+    
+    with col2:
+        search_button = st.button("Find Products", use_container_width=True)
 
-    # Check if price is 0 before proceeding
-    if price == 0:
-        st.warning("You can't buy products for free! Please set a maximum price greater than 0.")
-    elif query_params:  # Proceed only if there are valid parameters and price > 0
+    # Function to call the backend API
+    def get_recommendations(query):
+        # In a real app, this would call your backend API
+        # For demo purposes, we'll generate mock data
         try:
-            # Send POST request to backend
-            response = requests.post(
-                "http://127.0.0.1:8000/recommend",
-                json=query_params
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if data["recommendations"]:
-                    st.write("### Recommended Products:")
-                    for product in data["recommendations"]:
-                        st.markdown("----")
-                        cols = st.columns([1, 3])  # Left for image, right for details
-
-                        with cols[0]:
-                            if product.get("imgURL"):
-                                st.image(product["imgURL"], width=120, caption="", use_column_width=False, output_format='auto',)
-
-                        with cols[1]:
-                            title = product.get("title", "Unnamed Product")
-                            product_url = f"https://www.amazon.com/s?k={title.replace(' ', '+')}"
-
-                            if product_url and product_url.startswith("http"):
-                                st.markdown(f'<a href="{product_url}" target="_blank" style="color: #d32f2f;"><strong>{title}</strong></a>', unsafe_allow_html=True)
-                            else:
-                                st.markdown(f"**{title}**")
-
-                            st.write(f"<span style='color: #d32f2f; font-weight: bold;'>${product['price']:.2f}</span>", unsafe_allow_html=True)
-                            if "rating" in product:
-                                st.write(f"Rating: <span style='color: #0d47a1;'>{product['rating']} ★</span> ({product.get('review_count', 0)} reviews)", unsafe_allow_html=True)
-                            if "category" in product:
-                                st.write(f"Category: {product['category']}")
-                else:
-                    st.write("No recommendations found. Try adjusting your query.")
-            else:
-                st.error(f"Error fetching recommendations: {response.status_code} - {response.text}")
+            # Replace with actual API endpoint
+            # response = requests.post("http://your-backend-api/recommendations", 
+            #                        json={"query": query})
+            # return response.json()
+            
+            # Mock data for demonstration
+            return {
+                "recommendations": [
+                    {
+                        "name": f"Product for {query} - Option 1",
+                        "price": "$89.99",
+                        "description": "High-quality product that matches your requirements perfectly with excellent customer reviews.",
+                        "rating": 4.7,
+                        "image_url": "https://via.placeholder.com/150",
+                        "product_url": "https://example.com/product1"
+                    },
+                    {
+                        "name": f"Product for {query} - Option 2",
+                        "price": "$94.99",
+                        "description": "Great value option with slightly different features but still meeting your core requirements.",
+                        "rating": 4.5,
+                        "image_url": "https://via.placeholder.com/150",
+                        "product_url": "https://example.com/product2"
+                    },
+                    {
+                        "name": f"Premium {query}",
+                        "price": "$99.99",
+                        "description": "Premium version with additional features and longer warranty, still within your budget.",
+                        "rating": 4.8,
+                        "image_url": "https://via.placeholder.com/150",
+                        "product_url": "https://example.com/product3"
+                    }
+                ]
+            }
         except Exception as e:
-            st.error(f"An error occurred: {e}")
-    else:
-        st.warning("Please enter at least one preference (keywords, price, or stars).")
+            st.error(f"Error fetching recommendations: {e}")
+            return {"recommendations": []}
+
+    # Display recommendations when the button is clicked
+    if search_button and user_query:
+        with st.spinner('Finding the best products for you...'):
+            result = get_recommendations(user_query)
+            
+            if result["recommendations"]:
+                st.markdown("<div class='recommendation-header'><h2 style='text-align: center; margin: 0;'>Recommended Products</h2></div>", unsafe_allow_html=True)
+                
+                # Display each recommendation in a card format
+                for i, rec in enumerate(result["recommendations"]):
+                    with st.container():
+                        st.markdown(f"<div class='product-card'>", unsafe_allow_html=True)
+                        cols = st.columns([1, 3])
+                        
+                        with cols[0]:
+                            # Display image
+                            st.image(rec["image_url"], width=150)
+                            
+                        with cols[1]:
+                            # Product details
+                            st.markdown(f"<h3>{rec['name']}</h3>", unsafe_allow_html=True)
+                            st.markdown(f"<p><strong>Price:</strong> {rec['price']}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p><strong>Rating:</strong> {'⭐' * int(rec['rating'])} ({rec['rating']})</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p>{rec['description']}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<a href='{rec['product_url']}' target='_blank'>View Product</a>", unsafe_allow_html=True)
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.info("No products found matching your query. Try a different search term.")
+    
+    # Show a hint when the app first loads
+    if not search_button:
+        st.info("Enter your product preferences above and click 'Find Products' to get personalized recommendations.")
+
+# Footer
+st.markdown("""
+<div style='text-align: center; margin-top: 50px; padding: 20px; color: #666;'>
+    <p>© 2025 Product Recommendation System | All Rights Reserved</p>
+</div>
+""", unsafe_allow_html=True)
