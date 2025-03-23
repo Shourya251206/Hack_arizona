@@ -4,7 +4,7 @@ import requests
 # Configure page
 st.set_page_config(page_title="Product Recommendations", layout="wide")
 
-# Custom CSS with added microphone button styling
+# Custom CSS with enhanced microphone button styling
 st.markdown("""
 <style>
     .main {
@@ -67,97 +67,133 @@ st.markdown("""
         margin-bottom: 20px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
+    .voice-container {
+        background-color: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .transcript {
+        margin-top: 10px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        min-height: 30px;
+    }
+    .listening {
+        color: #ff6b6b;
+        font-weight: bold;
+    }
 </style>
-""", unsafe_allow_html=True)
-
-# Add JavaScript for speech recognition
-st.markdown("""
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Add event listener to microphone button after page loads
-        setTimeout(function() {
-            const micButton = document.querySelector('.mic-button');
-            if (micButton) {
-                micButton.addEventListener('click', startSpeechRecognition);
-            }
-        }, 1000);
-
-        function startSpeechRecognition() {
-            if (window.hasOwnProperty('webkitSpeechRecognition') || window.hasOwnProperty('SpeechRecognition')) {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const recognition = new SpeechRecognition();
-                
-                recognition.continuous = false;
-                recognition.interimResults = false;
-                recognition.lang = 'en-US';
-                
-                // Visual feedback
-                const micButton = document.querySelector('.mic-button');
-                if (micButton) {
-                    micButton.innerHTML = '<svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5C14.21 15.5 16 13.71 16 11.5V6C16 3.79 14.21 2 12 2C9.79 2 8 3.79 8 6V11.5C8 13.71 9.79 15.5 12 15.5Z" fill="white"/><path d="M4.03 12.5C3.76 12.5 3.5 12.26 3.5 12C3.5 7.52 7.02 3.5 12 3.5C16.98 3.5 20.5 7.52 20.5 12C20.5 12.28 20.24 12.5 19.97 12.5C19.7 12.5 19.5 12.26 19.5 12C19.5 8.14 16.36 4.5 12 4.5C7.64 4.5 4.5 8.14 4.5 12C4.5 12.26 4.3 12.5 4.03 12.5Z" fill="white"/><path d="M12 21.5C11.17 21.5 10.5 20.83 10.5 20V17.5C10.5 16.67 11.17 16 12 16C12.83 16 13.5 16.67 13.5 17.5V20C13.5 20.83 12.83 21.5 12 21.5Z" fill="white"/><path d="M17 22H7C6.59 22 6.25 21.66 6.25 21.25C6.25 20.84 6.59 20.5 7 20.5H17C17.41 20.5 17.75 20.84 17.75 21.25C17.75 21.66 17.41 22 17 22Z" fill="white"/></svg>';
-                    micButton.style.backgroundColor = '#ff6b6b';
-                }
-                
-                recognition.start();
-                
-                recognition.onresult = function(event) {
-                    const result = event.results[0][0].transcript;
-                    
-                    // Find the search input and update it
-                    const inputFields = document.querySelectorAll('input[type="text"]');
-                    if (inputFields.length > 0) {
-                        const inputField = inputFields[0];
-                        inputField.value = result;
-                        
-                        // Dispatch events to notify Streamlit
-                        inputField.dispatchEvent(new Event('input', { bubbles: true }));
-                        inputField.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                    
-                    // Reset mic button
-                    if (micButton) {
-                        micButton.innerHTML = '<svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16C14.2091 16 16 14.2091 16 12V6C16 3.79086 14.2091 2 12 2C9.79086 2 8 3.79086 8 6V12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 22H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                        micButton.style.backgroundColor = '#1e3d59';
-                    }
-                };
-                
-                recognition.onerror = function(event) {
-                    console.error('Speech recognition error:', event.error);
-                    // Reset mic button
-                    if (micButton) {
-                        micButton.innerHTML = '<svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16C14.2091 16 16 14.2091 16 12V6C16 3.79086 14.2091 2 12 2C9.79086 2 8 3.79086 8 6V12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 22H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                        micButton.style.backgroundColor = '#1e3d59';
-                    }
-                };
-                
-                recognition.onend = function() {
-                    // Reset mic button when recognition ends
-                    if (micButton) {
-                        micButton.innerHTML = '<svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16C14.2091 16 16 14.2091 16 12V6C16 3.79086 14.2091 2 12 2C9.79086 2 8 3.79086 8 6V12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 22H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                        micButton.style.backgroundColor = '#1e3d59';
-                    }
-                };
-            } else {
-                alert("Your browser doesn't support speech recognition. Please try using Chrome.");
-            }
-        }
-    });
-</script>
 """, unsafe_allow_html=True)
 
 # Header
 st.markdown("<h1 style='text-align: center; color: #1e3d59;'>Smart Product Recommendations</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #1e3d59;'>Find the perfect products based on your preferences</p>", unsafe_allow_html=True)
 
-# Inputs
-col1, col2, col3 = st.columns([3, 1, 2])
+# Initialize session state for voice input
+if "voice_transcript" not in st.session_state:
+    st.session_state.voice_transcript = ""
+
+# Voice Input Component
+st.markdown("<div class='voice-container'>", unsafe_allow_html=True)
+st.subheader("Voice Search")
+
+# Create a more sophisticated voice input component
+voice_html = """
+<div id="voiceSearchContainer">
+    <button id="voiceButton" class="mic-button" style="margin: 0 auto; display: block;">
+        <svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 16C14.2091 16 16 14.2091 16 12V6C16 3.79086 14.2091 2 12 2C9.79086 2 8 3.79086 8 6V12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 19V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8 22H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+    <p id="statusText" style="text-align: center; margin-top: 10px;">Click to speak</p>
+    <div id="transcript" class="transcript">Your spoken words will appear here</div>
+</div>
+
+<script>
+    // Set up speech recognition
+    document.addEventListener('DOMContentLoaded', function() {
+        const voiceButton = document.getElementById('voiceButton');
+        const statusText = document.getElementById('statusText');
+        const transcriptDiv = document.getElementById('transcript');
+        let recognition;
+        
+        if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.continuous = false;
+            
+            recognition.onstart = function() {
+                statusText.innerHTML = "<span class='listening'>Listening...</span>";
+                voiceButton.style.backgroundColor = '#ff6b6b';
+            };
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                transcriptDiv.textContent = transcript;
+                
+                // Send to Streamlit via session state
+                window.parent.postMessage({
+                    type: "streamlit:setComponentValue",
+                    value: transcript
+                }, "*");
+            };
+            
+            recognition.onerror = function(event) {
+                statusText.textContent = "Error: " + event.error;
+                voiceButton.style.backgroundColor = '#1e3d59';
+            };
+            
+            recognition.onend = function() {
+                statusText.textContent = "Click to speak";
+                voiceButton.style.backgroundColor = '#1e3d59';
+            };
+            
+            voiceButton.addEventListener('click', function() {
+                recognition.start();
+            });
+        } else {
+            statusText.textContent = "Speech recognition not supported in this browser";
+            voiceButton.disabled = true;
+            voiceButton.style.backgroundColor = '#cccccc';
+        }
+    });
+</script>
+"""
+
+import streamlit.components.v1 as components
+voice_component = components.html(voice_html, height=150)
+
+# Apply the voice result to the search field if available
+if st.session_state.voice_transcript:
+    st.markdown(f"<p>Recognized: <strong>{st.session_state.voice_transcript}</strong></p>", unsafe_allow_html=True)
+
+# Button to use voice input
+if st.button("Use Voice Input", key="use_voice"):
+    if st.session_state.voice_transcript:
+        keywords = st.session_state.voice_transcript
+        st.session_state.keywords = keywords
+    else:
+        st.warning("Please speak something first")
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# Regular search inputs
+st.subheader("Search Criteria")
+col1, col2 = st.columns([3, 1])
 with col1:
-    keywords = st.text_input("Enter keywords (e.g., 'running shoes')")
+    # Use the voice transcript if available, otherwise empty
+    default_keywords = st.session_state.get("keywords", "")
+    keywords = st.text_input("Enter keywords (e.g., 'running shoes')", value=default_keywords)
 with col2:
-    # Add microphone button
-    st.markdown('<button class="mic-button"><svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16C14.2091 16 16 14.2091 16 12V6C16 3.79086 14.2091 2 12 2C9.79086 2 8 3.79086 8 6V12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 22H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>', unsafe_allow_html=True)
-with col3:
-    price = st.number_input("Maximum price", min_value=0.0, value=100.0, step=5.0)  # Default to 100.0 instead of 0.0
+    price = st.number_input("Maximum price", min_value=0.0, value=100.0, step=5.0)
 
 # Filter section
 st.markdown("<div class='filter-container'>", unsafe_allow_html=True)
@@ -212,7 +248,28 @@ def get_recommendations(query_params):
         
         return mock_data
 
-# Display results - Modified to always work even when API is unavailable
+# Handle Streamlit component communication
+from streamlit.components.v1.components import _Component
+import json
+
+class StreamlitComponentCallback:
+    def __init__(self):
+        self._component_callback = None
+    
+    def __call__(self, callback):
+        self._component_callback = callback
+
+# Process voice input and update session state
+if voice_component:
+    try:
+        # This part will capture the result from the voice recognition
+        transcript = voice_component
+        if isinstance(transcript, str) and transcript:
+            st.session_state.voice_transcript = transcript
+    except:
+        pass
+
+# Display results
 if search_button and keywords:
     query_params = {"keywords": keywords}
     
@@ -269,7 +326,7 @@ if search_button and keywords:
     else:
         st.info("No recommendations found. Try different criteria.")
 else:
-    st.info("Enter product keywords and click 'Get Recommendations'.")
+    st.info("Enter product keywords or use voice input and click 'Get Recommendations'.")
 
 # Footer
 st.markdown("""
