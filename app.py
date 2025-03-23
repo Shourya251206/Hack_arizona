@@ -36,12 +36,29 @@ if st.button("Get Recommendations"):
                 if data["recommendations"]:
                     st.write("### Recommended Products:")
                     for product in data["recommendations"]:
-                        st.write(f"- **{product['title']}** - ${product['price']:.2f}")
-                        if "rating" in product:
-                            st.write(f"  Rating: {product['rating']} ★ ({product.get('review_count', 0)} reviews)")
-                        if "category" in product:
-                            st.write(f"  Category: {product['category']}")
-                        st.write("---")
+                        st.markdown("----")
+                        cols = st.columns([1, 3])  # Left for image, right for details
+
+                        with cols[0]:
+                            if product.get("imgURL"):
+                                st.image(product["imgURL"], width=120)
+
+                        with cols[1]:
+                            title = product.get("title", "Unnamed Product")
+                            title = product.get("title", "Unnamed Product")
+                            product_url = f"https://www.amazon.com/s?k={title.replace(' ', '+')}"
+
+                            if product_url and product_url.startswith("http"):
+                                st.markdown(f'<a href="{product_url}" target="_blank"><strong>{title}</strong></a>', unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"**{title}**")
+
+                            st.write(f"${product['price']:.2f}")
+                            if "rating" in product:
+                                st.write(f"Rating: {product['rating']} ★ ({product.get('review_count', 0)} reviews)")
+                            if "category" in product:
+                                st.write(f"Category: {product['category']}")
+
                 else:
                     st.write("No recommendations found. Try adjusting your query.")
             else:
