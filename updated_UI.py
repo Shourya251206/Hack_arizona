@@ -1,118 +1,79 @@
 import streamlit as st
 import requests
-import json
 
-# Set page configuration
+# Set page config first (must be the first Streamlit command)
 st.set_page_config(
     page_title="Smart Product Recommender",
     page_icon="🛍️",
     layout="wide"
 )
 
-# Custom CSS for the fixed color scheme: sky blue, red, and white
-def apply_custom_css():
-    st.markdown("""
-    <style>
-    /* Main background color - Sky Blue */
-    .stApp {
-        background-color: #87CEEB !important;
-    }
+# Choose one of these light blue colors:
+# LIGHT_BLUE = "#E3F2FD"  # Very light blue (Material UI)
+# LIGHT_BLUE = "#BBDEFB"  # Light blue (Material UI)
+LIGHT_BLUE = "#90CAF9"  # Medium light blue (Material UI)
+# LIGHT_BLUE = "#64B5F6"  # Slightly darker light blue (Material UI)
+# LIGHT_BLUE = "#B3E5FC"  # Light cyan blue (Material UI)
+# LIGHT_BLUE = "#D4F1F9"  # Very soft light blue
+# LIGHT_BLUE = "#CCE5FF"  # Soft blue (Bootstrap)
+
+# Define the red color
+RED_COLOR = "#FF0000"  # Pure red
+# RED_COLOR = "#F44336"  # Material UI red (slightly softer)
+
+# Apply base CSS for the color scheme
+st.markdown(f"""
+<style>
+    /* Main background - Light Blue */
+    .main {{
+        background-color: {LIGHT_BLUE};
+    }}
     
-    /* Header styling - White */
-    .main-header {
-        font-size: 40px !important;
-        font-weight: bold;
-        color: #000000;
-        text-align: center;
-        margin-bottom: 30px;
+    /* Make the content area light blue */
+    .block-container {{
+        background-color: {LIGHT_BLUE};
+        padding: 1rem;
+    }}
+    
+    /* Make sure text is visible */
+    p, h1, h2, h3, h4, h5, h6 {{
+        color: black;
+    }}
+    
+    /* Custom classes */
+    .white-container {{
+        background-color: white;
         padding: 20px;
         border-radius: 10px;
-        background-color: white;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
+        margin-bottom: 20px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }}
     
-    /* Search bar - Red */
-    .search-section {
-        background-color: #FF0000;
+    .red-container {{
+        background-color: {RED_COLOR};
         padding: 20px;
         border-radius: 10px;
         margin-bottom: 20px;
         color: white;
-    }
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }}
     
-    /* Input fields within red section */
-    .search-section .stTextInput input {
-        border-color: white !important;
-        color: black !important;
-        background-color: white !important;
-    }
-    
-    /* Product cards - White */
-    .product-card {
-        background-color: white;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Sidebar content - White */
-    .sidebar-content {
-        background-color: white;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-    }
-    
-    /* Section headers - White with border */
-    .section-header {
-        background-color: white;
-        padding: 10px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-        font-weight: bold;
-    }
-    
-    /* Filter section - White */
-    .filter-section {
-        background-color: white;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-    }
-    
-    /* Buttons - Red */
-    .stButton button {
-        background-color: #FF0000 !important;
+    /* Make buttons red */
+    .stButton > button {{
+        background-color: {RED_COLOR} !important;
         color: white !important;
         border: none !important;
-    }
-    
-    .stButton button:hover {
-        background-color: #CC0000 !important;
-    }
-    
-    /* Cart items - White */
-    .cart-item {
-        background-color: white;
-        border-radius: 8px;
-        padding: 10px;
-        margin-bottom: 10px;
-        border-left: 4px solid #FF0000;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    }}
+</style>
+""", unsafe_allow_html=True)
 
-# Apply the custom CSS
-apply_custom_css()
-
-# Initialize session state if not already set
+# Initialize session state
 if 'cart' not in st.session_state:
     st.session_state.cart = []
 if 'search_history' not in st.session_state:
     st.session_state.search_history = []
 
-# Function to fetch recommendations from backend API
+# Function to fetch recommendations
 def get_recommendations(query):
     api_url = f"http://127.0.0.1:8000/recommend?query={query}"
     try:
@@ -126,42 +87,35 @@ def get_recommendations(query):
 # Function to add item to cart
 def add_to_cart(product):
     st.session_state.cart.append(product)
-    st.success(f"✅ {product['name']} added to cart!")
+    st.success(f"{product['name']} added to cart!")
 
 # Function to remove item from cart
 def remove_from_cart(index):
     removed_item = st.session_state.cart.pop(index)
-    st.success(f"🗑️ Removed {removed_item['name']} from cart")
+    st.success(f"Removed {removed_item['name']} from cart")
 
-# Function to clear cart
-def clear_cart():
-    st.session_state.cart = []
-    st.success("Cart cleared!")
+# App title
+st.title("🛍️ Smart Product Recommender")
 
-# Main app header
-st.markdown("<h1 class='main-header'>🛍️ Smart Product Recommender</h1>", unsafe_allow_html=True)
+# Create two columns for layout
+col1, col2 = st.columns([3, 1])
 
-# Create columns for layout
-main_col, sidebar_col = st.columns([3, 1])
-
-with main_col:
-    # Search section - Red background
-    st.markdown("<div class='search-section'>", unsafe_allow_html=True)
+with col1:
+    # Search section - RED container
+    st.markdown("<div class='red-container'>", unsafe_allow_html=True)
     query = st.text_input("Enter a product name or keyword:", "")
+    search_button = st.button("Search Products", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Filters section - White background
-    st.markdown("<div class='filter-section'>", unsafe_allow_html=True)
-    st.markdown("<h3>Filter Products</h3>", unsafe_allow_html=True)
+    # Filters section - WHITE container
+    st.markdown("<div class='white-container'>", unsafe_allow_html=True)
+    st.subheader("Filter Products")
     
     filter_col1, filter_col2 = st.columns(2)
     with filter_col1:
-        category = st.selectbox("Filter by Category:", ["All", "Electronics", "Fashion", "Books", "Home Appliances"])
-    
+        category = st.selectbox("Category:", ["All", "Electronics", "Fashion", "Books", "Home Appliances"])
     with filter_col2:
-        price_range = st.slider("Filter by Price Range ($):", 0, 500, (0, 500))
-    
-    search_button = st.button("Search Products", use_container_width=True)
+        price_range = st.slider("Price Range ($):", 0, 500, (0, 500))
     st.markdown("</div>", unsafe_allow_html=True)
     
     # Process search
@@ -169,10 +123,12 @@ with main_col:
         st.session_state.search_history.append(query)
         recommendations = get_recommendations(query)
         
+        # Results section - WHITE container
+        st.markdown("<div class='white-container'>", unsafe_allow_html=True)
+        st.subheader("Recommended Products")
+        
         if recommendations:
-            st.markdown("<div class='section-header'>Recommended Products</div>", unsafe_allow_html=True)
-            
-            # Filter products based on criteria
+            # Filter products
             filtered_products = []
             for product in recommendations:
                 try:
@@ -180,64 +136,31 @@ with main_col:
                 except ValueError:
                     price = 0
                 
-                # Apply filters
-                if (category == "All" or product.get('category') == category) and (price_range[0] <= price <= price_range[1]):
+                if (category == "All" or product.get('category') == category) and \
+                   (price_range[0] <= price <= price_range[1]):
                     filtered_products.append(product)
             
             if filtered_products:
-                # Create two-column layout for products
-                cols = st.columns(2)
-                
-                for index, product in enumerate(filtered_products):
-                    with cols[index % 2]:
-                        st.markdown(f"""
-                        <div class='product-card'>
-                            <h3>{product['name']}</h3>
-                            <p>Category: {product.get('category', 'Unknown')}</p>
-                            <p>💲{product.get('price', 0)}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        # Display product image
+                # Create product grid
+                product_cols = st.columns(2)
+                for idx, product in enumerate(filtered_products):
+                    with product_cols[idx % 2]:
+                        st.write(f"**{product['name']}**")
+                        st.write(f"Category: {product.get('category', 'Unknown')}")
+                        st.write(f"Price: ${product.get('price', 0)}")
                         st.image(product.get('image_url', 'https://via.placeholder.com/150'), width=150)
-                        
-                        # Add to cart button
-                        st.button("Add to Cart", key=f"cart_{index}", on_click=add_to_cart, args=(product,))
+                        st.button("Add to Cart", key=f"add_{idx}", on_click=add_to_cart, args=(product,))
+                        st.write("---")
             else:
-                st.warning("No products match your filters. Try adjusting your criteria.")
+                st.write("No products match your filters. Try adjusting your criteria.")
         else:
-            st.warning("No recommendations found! Try a different search term.")
+            st.write("No recommendations found. Try a different search term.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-with sidebar_col:
-    # Shopping Cart section - White background
-    st.markdown("<div class='sidebar-content'>", unsafe_allow_html=True)
-    st.markdown("<h3>🛒 Your Shopping Cart</h3>", unsafe_allow_html=True)
+with col2:
+    # Cart section - WHITE container
+    st.markdown("<div class='white-container'>", unsafe_allow_html=True)
+    st.subheader("🛒 Your Cart")
     
     if st.session_state.cart:
-        total_price = sum(float(item.get('price', 0)) for item in st.session_state.cart)
-        
-        for i, item in enumerate(st.session_state.cart):
-            st.markdown(f"""
-            <div class='cart-item'>
-                <strong>{item['name']}</strong><br>
-                💲{item.get('price', 0)}
-            </div>
-            """, unsafe_allow_html=True)
-            st.button("Remove", key=f"remove_{i}", on_click=remove_from_cart, args=(i,))
-        
-        st.markdown(f"<h4>Total: 💲{total_price:.2f}</h4>", unsafe_allow_html=True)
-        st.button("Clear Cart", on_click=clear_cart)
-    else:
-        st.info("Your cart is empty.")
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Search History section - White background
-    st.markdown("<div class='sidebar-content'>", unsafe_allow_html=True)
-    st.markdown("<h3>🔍 Recent Searches</h3>", unsafe_allow_html=True)
-    
-    if st.session_state.search_history:
-        for hist in st.session_state.search_history[-5:]:
-            st.markdown(f"• {hist}")
-    else:
-        st.info("No search history yet.")
-    st.markdown("</div>", unsafe_allow_html=True)
+        total = sum(float(item.get('p
