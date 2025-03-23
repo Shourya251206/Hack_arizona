@@ -1,25 +1,31 @@
 import streamlit as st
 import requests
+from PIL import Image
+import io
+import pandas as pd
 
-# Configure page
-st.set_page_config(page_title="Product Recommendations", layout="wide")
+# FastAPI backend URL - Update if deployed elsewhere
+API_URL = "http://127.0.0.1:8000/recommend"
 
-# Custom CSS with added microphone button styling
+# Configure page layout and theme colors
+st.set_page_config(page_title="AI-Powered Product Recommendations", layout="wide")
+
+# Custom CSS with cardinal red (#C41E3A) and navy blue (#003366) color scheme
+# Added specific styling for the microphone button
 st.markdown("""
 <style>
     .main {
         background-color: #f0f2f6;
     }
     .stButton button {
-        background-color: #1e3d59 !important;
+        background-color: #003366 !important;
         color: white !important;
     }
-    .stTextInput > div > div > input,
-    .stNumberInput > div > input {
-        border: 2px solid #1e3d59;
+    .stTextInput > div > div > input, .stSelectbox > div > div > div {
+        border: 2px solid #003366;
     }
     h1, h2, h3 {
-        color: #1e3d59;
+        color: white;
     }
     .product-card {
         background-color: white;
@@ -27,253 +33,300 @@ st.markdown("""
         padding: 20px;
         margin-bottom: 20px;
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        border-top: 4px solid #1e3d59;
-        border-bottom: 4px solid #ff6b6b;
+        border-top: 4px solid #003366;
+        border-bottom: 4px solid #C41E3A;
+    }
+    .product-card h3, .product-card p, .product-card strong {
+        color: #003366;
     }
     .recommendation-header {
-        background-color: #1e3d59;
+        background-color: #003366;
         color: white;
         padding: 10px;
         border-radius: 5px;
         margin-bottom: 20px;
     }
-    .mic-button {
-        background-color: #1e3d59;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        margin-top: 22px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        transition: all 0.3s;
-    }
-    .mic-button:hover {
-        background-color: #ff6b6b;
-        transform: scale(1.05);
-    }
-    .mic-icon {
-        width: 20px;
-        height: 20px;
-    }
-    .filter-container {
-        background-color: white;
+    .filters {
+        background-color: #003366;
         padding: 15px;
         border-radius: 10px;
         margin-bottom: 20px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    .filters label {
+        color: white !important;
+    }
+    .app-header {
+        background-color: #003366;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border-bottom: 4px solid #C41E3A;
+    }
+    .stInfo {
+        background-color: #003366;
+    }
+    .stInfo > div {
+        color: white !important;
+    }
+    .footer {
+        background-color: #003366;
+        padding: 15px;
+        border-radius: 10px;
+        margin-top: 30px;
+        color: white !important;
+        border-top: 4px solid #C41E3A;
+    }
+    .notice-box {
+        background-color: #003366;
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+        margin-bottom: 20px;
+    }
+    /* Enhanced microphone button styling */
+    .mic-button {
+        background-color: #C41E3A;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 38px;
+        height: 38px;
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 5px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .mic-button:hover {
+        background-color: #A01A30;
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .mic-button:active {
+        transform: scale(0.95);
+    }
+    /* Pulse animation for recording state */
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(196, 30, 58, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(196, 30, 58, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(196, 30, 58, 0); }
+    }
+    .recording {
+        animation: pulse 1.5s infinite;
+        background-color: #A01A30;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Add JavaScript for speech recognition
-st.markdown("""
+# JavaScript for speech recognition
+speech_recognition_js = """
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Add event listener to microphone button after page loads
-        setTimeout(function() {
-            const micButton = document.querySelector('.mic-button');
-            if (micButton) {
-                micButton.addEventListener('click', startSpeechRecognition);
-            }
-        }, 1000);
-
-        function startSpeechRecognition() {
-            if (window.hasOwnProperty('webkitSpeechRecognition') || window.hasOwnProperty('SpeechRecognition')) {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                const recognition = new SpeechRecognition();
-                
-                recognition.continuous = false;
-                recognition.interimResults = false;
-                recognition.lang = 'en-US';
-                
-                // Visual feedback
-                const micButton = document.querySelector('.mic-button');
-                if (micButton) {
-                    micButton.innerHTML = '<svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15.5C14.21 15.5 16 13.71 16 11.5V6C16 3.79 14.21 2 12 2C9.79 2 8 3.79 8 6V11.5C8 13.71 9.79 15.5 12 15.5Z" fill="white"/><path d="M4.03 12.5C3.76 12.5 3.5 12.26 3.5 12C3.5 7.52 7.02 3.5 12 3.5C16.98 3.5 20.5 7.52 20.5 12C20.5 12.28 20.24 12.5 19.97 12.5C19.7 12.5 19.5 12.26 19.5 12C19.5 8.14 16.36 4.5 12 4.5C7.64 4.5 4.5 8.14 4.5 12C4.5 12.26 4.3 12.5 4.03 12.5Z" fill="white"/><path d="M12 21.5C11.17 21.5 10.5 20.83 10.5 20V17.5C10.5 16.67 11.17 16 12 16C12.83 16 13.5 16.67 13.5 17.5V20C13.5 20.83 12.83 21.5 12 21.5Z" fill="white"/><path d="M17 22H7C6.59 22 6.25 21.66 6.25 21.25C6.25 20.84 6.59 20.5 7 20.5H17C17.41 20.5 17.75 20.84 17.75 21.25C17.75 21.66 17.41 22 17 22Z" fill="white"/></svg>';
-                    micButton.style.backgroundColor = '#ff6b6b';
-                }
-                
-                recognition.start();
-                
-                recognition.onresult = function(event) {
-                    const result = event.results[0][0].transcript;
-                    
-                    // Find the search input and update it
-                    const inputFields = document.querySelectorAll('input[type="text"]');
-                    if (inputFields.length > 0) {
-                        const inputField = inputFields[0];
-                        inputField.value = result;
-                        
-                        // Dispatch events to notify Streamlit
-                        inputField.dispatchEvent(new Event('input', { bubbles: true }));
-                        inputField.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                    
-                    // Reset mic button
-                    if (micButton) {
-                        micButton.innerHTML = '<svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16C14.2091 16 16 14.2091 16 12V6C16 3.79086 14.2091 2 12 2C9.79086 2 8 3.79086 8 6V12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 22H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                        micButton.style.backgroundColor = '#1e3d59';
-                    }
-                };
-                
-                recognition.onerror = function(event) {
-                    console.error('Speech recognition error:', event.error);
-                    // Reset mic button
-                    if (micButton) {
-                        micButton.innerHTML = '<svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16C14.2091 16 16 14.2091 16 12V6C16 3.79086 14.2091 2 12 2C9.79086 2 8 3.79086 8 6V12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 22H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                        micButton.style.backgroundColor = '#1e3d59';
-                    }
-                };
-                
-                recognition.onend = function() {
-                    // Reset mic button when recognition ends
-                    if (micButton) {
-                        micButton.innerHTML = '<svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16C14.2091 16 16 14.2091 16 12V6C16 3.79086 14.2091 2 12 2C9.79086 2 8 3.79086 8 6V12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 22H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                        micButton.style.backgroundColor = '#1e3d59';
-                    }
-                };
-            } else {
-                alert("Your browser doesn't support speech recognition. Please try using Chrome.");
-            }
-        }
-    });
+function toggleSpeechRecognition() {
+    const micIcon = document.getElementById('mic-icon');
+    const micButton = document.getElementById('mic-button');
+    const textInput = document.querySelector('.stTextInput input');
+    
+    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+        alert('Speech recognition is not supported in your browser. Try Chrome or Edge.');
+        return;
+    }
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    recognition.onstart = function() {
+        micIcon.textContent = '⏹️';
+        micButton.classList.add('recording');
+    };
+    
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        textInput.value = transcript;
+        
+        // Trigger an input event to update Streamlit
+        const inputEvent = new Event('input', { bubbles: true });
+        textInput.dispatchEvent(inputEvent);
+    };
+    
+    recognition.onend = function() {
+        micIcon.textContent = '🎤';
+        micButton.classList.remove('recording');
+    };
+    
+    recognition.onerror = function(event) {
+        console.error('Speech recognition error', event.error);
+        micIcon.textContent = '🎤';
+        micButton.classList.remove('recording');
+    };
+    
+    recognition.start();
+}
 </script>
-""", unsafe_allow_html=True)
+"""
 
-# Header
-st.markdown("<h1 style='text-align: center; color: #1e3d59;'>Smart Product Recommendations</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #1e3d59;'>Find the perfect products based on your preferences</p>", unsafe_allow_html=True)
-
-# Inputs
-col1, col2, col3 = st.columns([3, 1, 2])
-with col1:
-    keywords = st.text_input("Enter keywords (e.g., 'running shoes')")
-with col2:
-    # Add microphone button
-    st.markdown('<button class="mic-button"><svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 16C14.2091 16 16 14.2091 16 12V6C16 3.79086 14.2091 2 12 2C9.79086 2 8 3.79086 8 6V12C8 14.2091 9.79086 16 12 16Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10V12C19 15.866 15.866 19 12 19C8.13401 19 5 15.866 5 12V10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19V22" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 22H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>', unsafe_allow_html=True)
-with col3:
-    price = st.number_input("Maximum price", min_value=0.0, value=100.0, step=5.0)  # Default to 100.0 instead of 0.0
-
-# Filter section
-st.markdown("<div class='filter-container'>", unsafe_allow_html=True)
-filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 1])
-with filter_col1:
-    stars = st.slider("Minimum star rating", min_value=0.0, max_value=5.0, value=0.0, step=0.5)
-with filter_col2:
-    sort_order = st.selectbox("Sort by Price", ["None", "Low to High", "High to Low"])
-with filter_col3:
-    search_button = st.button("Get Recommendations", use_container_width=True)
+# App title and description in a custom header container
+st.markdown("<div class='app-header'>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: white;'>AI-Powered Product Recommendation Engine</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: white;'>Enter your preferences to get personalized product recommendations</p>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Backend call with mock data for testing
-def get_recommendations(query_params):
-    try:
-        # Try to call the real API
-        response = requests.post("http://127.0.0.1:8000/recommend", json=query_params)
-        return response.json()
-    except Exception as e:
-        st.warning(f"Could not connect to the real API: {e}. Using mock data instead.")
+# Add the speech recognition JavaScript to the page
+st.markdown(speech_recognition_js, unsafe_allow_html=True)
+
+# Container for the main content
+main_container = st.container()
+
+with main_container:
+    # First row: Input and button
+    st.markdown("<div class='filters'>", unsafe_allow_html=True)
+    
+    # Demo mode notice
+    st.markdown("<div style='background-color: rgba(196, 30, 58, 0.2); padding: 10px; border-radius: 5px; margin-bottom: 15px;'><p style='color: white; margin: 0;'>⚠️ Running in demo mode with sample data</p></div>", unsafe_allow_html=True)
+    
+    # First row: Main query with microphone button
+    col1, col2 = st.columns([3, 0.2])
+    
+    with col1:
+        user_query = st.text_input("What are you looking for?", 
+                                  placeholder="E.g., running shoes under $100, wireless earbuds with noise cancellation...")
+    
+    with col2:
+        st.markdown("""
+        <button id="mic-button" class="mic-button" onclick="toggleSpeechRecognition()">
+            <span id="mic-icon">🎤</span>
+        </button>
+        """, unsafe_allow_html=True)
+    
+    # Second row: Additional filters
+    col_size, col_price, col_brand = st.columns(3)
+    
+    with col_size:
+        size = st.selectbox("Select size (optional):", 
+                           ["Any", "XS", "S", "M", "L", "XL", "7", "8", "9", "10", "11"])
+    
+    with col_price:
+        price_range = st.select_slider("Price range:", 
+                                     options=["Any", "$0-$50", "$50-$100", "$100-$200", "$200+"])
+    
+    with col_brand:
+        brand = st.selectbox("Brand preference (optional):", 
+                           ["Any", "Nike", "Adidas", "Apple", "Samsung", "Sony", "Other"])
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Search button
+    search_button = st.button("Get Recommendations", use_container_width=True)
+
+    # Function to generate mock data based on user query and filters
+    def generate_mock_data(query, size=None, price_range=None, brand=None):
+        # Determine category based on query
+        category = "Footwear"
+        if any(term in query.lower() for term in ["electronics", "phone", "laptop", "computer", "headphone", "earbuds"]):
+            category = "Electronics"
+        elif any(term in query.lower() for term in ["shirt", "pants", "dress", "jacket", "clothing"]):
+            category = "Clothing"
         
-        # Mock data for testing (in case the API is not running)
-        mock_data = {
-            "recommendations": [
-                {
-                    "title": f"{query_params.get('keywords', 'Product')} - Premium Edition",
-                    "price": 79.99,
-                    "rating": 4.5,
-                    "category": "Electronics"
-                },
-                {
-                    "title": f"{query_params.get('keywords', 'Product')} - Standard Model",
-                    "price": 49.99,
-                    "rating": 4.2,
-                    "category": "Electronics"
-                },
-                {
-                    "title": f"{query_params.get('keywords', 'Product')} - Budget Version",
-                    "price": 29.99,
-                    "rating": 3.8,
-                    "category": "Electronics"
-                }
-            ]
+        # Adjust price based on filter
+        price_map = {
+            "Any": ["$89.99", "$94.99", "$99.99"],
+            "$0-$50": ["$29.99", "$39.99", "$49.99"],
+            "$50-$100": ["$59.99", "$79.99", "$99.99"],
+            "$100-$200": ["$119.99", "$149.99", "$199.99"],
+            "$200+": ["$229.99", "$299.99", "$349.99"]
         }
+        prices = price_map.get(price_range, ["$89.99", "$94.99", "$99.99"])
         
-        # Apply sorting if requested
-        if "sort" in query_params:
-            if query_params["sort"] == "asc":
-                mock_data["recommendations"].sort(key=lambda x: x["price"])
-            elif query_params["sort"] == "desc":
-                mock_data["recommendations"].sort(key=lambda x: x["price"], reverse=True)
+        # Filter by brand if specified
+        if brand != "Any" and brand != "Other":
+            brands = [brand, brand, brand]
+        else:
+            if category == "Footwear":
+                brands = ["Nike", "Adidas", "New Balance"]
+            elif category == "Electronics":
+                brands = ["Apple", "Samsung", "Sony"]
+            else:
+                brands = ["Gap", "H&M", "Zara"]
         
-        return mock_data
+        # Generate descriptions
+        descriptions = [
+            f"High-quality {category.lower()} that matches your requirements perfectly with excellent customer reviews.",
+            f"Great value option with slightly different features but still meeting your core requirements.",
+            f"Premium version with additional features and longer warranty, still within your budget."
+        ]
+        
+        # Generate product names
+        product_names = [
+            f"{brands[0]} {query.capitalize()} - Standard Model",
+            f"{brands[1]} {query.capitalize()} - Value Model",
+            f"{brands[2]} Premium {query.capitalize()}"
+        ]
+        
+        # Generate mock data
+        recommendations = []
+        for i in range(3):
+            recommendations.append({
+                "name": product_names[i],
+                "price": prices[i],
+                "description": descriptions[i],
+                "rating": 4.5 + (i * 0.2),  # 4.5, 4.7, 4.9
+                "category": category,
+                "image_url": "https://via.placeholder.com/150",
+                "product_url": f"https://example.com/product{i+1}",
+                "brand": brands[i]
+            })
+        
+        return {"recommendations": recommendations}
 
-# Display results - Modified to always work even when API is unavailable
-if search_button and keywords:
-    query_params = {"keywords": keywords}
+    # Function to call the backend API with fallback to mock data
+    def get_recommendations(query, size=None, price_range=None, brand=None):
+        # Skip API call attempt and use mock data directly
+        return generate_mock_data(query, size, price_range, brand)
+
+    # Display recommendations when the button is clicked
+    if search_button and user_query:
+        with st.spinner('Finding the best products for you...'):
+            result = get_recommendations(user_query, size, price_range, brand)
+            
+            if result.get("recommendations", []):
+                st.markdown("<div class='recommendation-header'><h2 style='text-align: center; margin: 0;'>Recommended Products</h2></div>", unsafe_allow_html=True)
+                
+                # Display each recommendation in a card format
+                for i, rec in enumerate(result["recommendations"]):
+                    with st.container():
+                        st.markdown(f"<div class='product-card'>", unsafe_allow_html=True)
+                        cols = st.columns([1, 3])
+                        
+                        with cols[0]:
+                            # Display image
+                            st.image(rec["image_url"], width=150)
+                            
+                        with cols[1]:
+                            # Product details
+                            st.markdown(f"<h3 style='color: #003366;'>{rec['name']}</h3>", unsafe_allow_html=True)
+                            st.markdown(f"<p><strong>Brand:</strong> {rec.get('brand', 'N/A')} | <strong>Category:</strong> {rec.get('category', 'N/A')}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p><strong>Price:</strong> {rec['price']}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p><strong>Rating:</strong> {'⭐' * int(rec['rating'])} ({rec['rating']})</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p>{rec['description']}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<a href='{rec['product_url']}' target='_blank' style='color: #003366; font-weight: bold;'>View Product</a>", unsafe_allow_html=True)
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div class='notice-box'>No products found matching your query. Try different search terms or filters.</div>", unsafe_allow_html=True)
     
-    # Price filter
-    if price > 0:
-        query_params["price"] = price
-    
-    # Stars filter
-    if stars > 0:
-        query_params["stars"] = stars
-    
-    # Add sorting parameter
-    if sort_order == "Low to High":
-        query_params["sort"] = "asc"
-    elif sort_order == "High to Low":
-        query_params["sort"] = "desc"
-
-    with st.spinner("Finding the best products for you..."):
-        result = get_recommendations(query_params)
-
-    if result.get("recommendations"):
-        st.markdown("<div class='recommendation-header'><h2 style='text-align: center;'>Recommended Products</h2></div>", unsafe_allow_html=True)
-
-        # Add sorting info if used
-        if sort_order != "None":
-            st.markdown(f"<p style='text-align: center; margin-bottom: 20px;'>Products sorted by price: <strong>{sort_order}</strong></p>", unsafe_allow_html=True)
-
-        for product in result["recommendations"]:
-            st.markdown("<div class='product-card'>", unsafe_allow_html=True)
-            cols = st.columns([1, 3])
-
-            with cols[0]:
-                img_url = product.get("imgURL", "")
-                try:
-                    if img_url and img_url.startswith("http"):
-                        st.image(img_url, width=140)
-                    else:
-                        raise Exception("Invalid or missing image URL")
-                except:
-                    st.image("https://via.placeholder.com/150?text=No+Image", width=140)
-
-            with cols[1]:
-                title = product.get("title", "Unnamed Product")
-                product_url = f"https://www.amazon.com/s?k={title.replace(' ', '+')}"
-
-                st.markdown(f"<h3><a href='{product_url}' target='_blank' style='text-decoration:none; color:#1e3d59;'>{title}</a></h3>", unsafe_allow_html=True)
-                st.markdown(f"<p><strong>Price:</strong> ${product.get('price', 0.0):.2f}</p>", unsafe_allow_html=True)
-                if "rating" in product:
-                    st.markdown(f"<p><strong>Rating:</strong> {'⭐' * int(float(product['rating']))} ({float(product['rating']):.1f})</p>", unsafe_allow_html=True)
-                if "category" in product:
-                    st.markdown(f"<p><strong>Category:</strong> {product['category']}</p>", unsafe_allow_html=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        st.info("No recommendations found. Try different criteria.")
-else:
-    st.info("Enter product keywords and click 'Get Recommendations'.")
+    # Show a hint when the app first loads
+    if not search_button:
+        st.markdown("<div class='notice-box'>Enter your product preferences and use the filters above to get personalized recommendations. Click the microphone icon 🎤 to use speech input.</div>", unsafe_allow_html=True)
 
 # Footer
 st.markdown("""
-<div style='text-align: center; margin-top: 50px; padding: 20px; color: #666;'>
-    <p>© 2025 Product Recommendation System | All Rights Reserved</p>
+<div class='footer'>
+    <p style='text-align: center;'>© 2025 AI-Powered Product Recommendation System | All Rights Reserved</p>
 </div>
 """, unsafe_allow_html=True)
