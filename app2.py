@@ -1,28 +1,16 @@
 import streamlit as st
 import requests
-import speech_recognition as sr
+import speech_recognition as sr  # Added for voice-to-text
 
 # Configure page
-st.set_page_config(page_title="Product Recommendations", layout="wide")
+st.set_page_config(page_title="Product Recommendation System", layout="wide")
 
-# Custom CSS (kept minimal and adjusted for mic icon)
+# Custom CSS for styling the mic button
 st.markdown("""
 <style>
-    .stButton button {
-        background-color: #1e3d59 !important;
-        color: white !important;
-    }
-    .stTextInput > div > div > input,
-    .stNumberInput > div > input {
-        border: 2px solid #1e3d59;
-    }
-    h1, h2, h3 {
-        color: #1e3d59;
-    }
-    /* Specific styling for the mic button */
     button[kind="mic_button"] {
-        background-color: #1e3d59 !important;
-        color: white !important;
+        background-color: #1e3d59 !important;  /* Dark blue background */
+        color: white !important;              /* White mic icon */
         font-size: 24px !important;
         padding: 5px 10px !important;
         border: none !important;
@@ -31,7 +19,7 @@ st.markdown("""
         cursor: pointer !important;
     }
     button[kind="mic_button"]:hover {
-        background-color: #355d82 !important;
+        background-color: #355d82 !important; /* Lighter blue on hover */
     }
 </style>
 """, unsafe_allow_html=True)
@@ -58,9 +46,9 @@ def voice_to_text():
 
 # User Input Fields
 keywords = st.text_input("Enter keywords (e.g., 'running shoes')", "")
-if st.button("🎤", key="mic_button", type="primary"):
+if st.button("🎤", key="mic_button"):
     keywords = voice_to_text()
-    st.session_state["keywords"] = keywords
+    st.session_state["keywords"] = keywords  # Update the input field
 
 price = st.number_input("Maximum price (optional)", min_value=0.0, value=0.0, step=10.0)
 stars = st.slider("Minimum star rating (optional)", min_value=0.0, max_value=5.0, value=0.0, step=0.5)
@@ -88,21 +76,17 @@ if st.button("Get Recommendations"):
             )
             if response.status_code == 200:
                 data = response.json()
-
-                # Debug raw response
-                with st.expander("Debug: Raw Backend Response"):
-                    st.json(data)
-
                 if data["recommendations"]:
                     st.write("### Recommended Products:")
-                    # Sorting options
+                    
+                    # Sorting options (replacing "filter button")
                     sort_option = st.selectbox(
                         "Sort by price:",
                         ["Default", "Low to High", "High to Low"],
                         key="sort_select"
                     )
                     
-                    # Sort recommendations
+                    # Sort recommendations based on selection
                     recommendations = data["recommendations"]
                     if sort_option == "Low to High":
                         recommendations = sorted(recommendations, key=lambda x: float(x["price"]))
@@ -135,13 +119,10 @@ if st.button("Get Recommendations"):
                                 st.write(f"Price: {raw_price} (Invalid format)")
 
                             if "rating" in product:
-                                try:
-                                    rating = float(product["rating"])
-                                    st.write(f"Rating: {rating} ★ ({product.get('review_count', 0)} reviews)")
-                                except (ValueError, TypeError):
-                                    st.write(f"Rating: {product['rating']} (Invalid format)")
+                                st.write(f"Rating: {product['rating']} ★ ({product.get('review_count', 0)} reviews)")
                             if "category" in product:
                                 st.write(f"Category: {product['category']}")
+
                 else:
                     st.write("No recommendations found. Try adjusting your query.")
             else:
