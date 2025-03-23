@@ -138,7 +138,7 @@ class AmazonProductRecommender:
             sorted_indices = sorted(filtered_similarities, key=lambda x: x[1], reverse=True)
             top_indices = [idx for idx, _ in sorted_indices[:top_n]]
             recommendations = self.product_data.iloc[top_indices]
-            result_fields = ['asin', 'title', 'category', 'price', 'rating', 'review_count', 'sales_rank']
+            result_fields = ['asin', 'title', 'category', 'price', 'rating', 'review_count', 'sales_rank', 'imgUrl', 'productURL']
             return recommendations[result_fields].to_dict('records')
         return []
 
@@ -195,7 +195,7 @@ class AmazonProductRecommender:
             cluster_products = cluster_products.sort_values('sales_rank')
 
         recommendations = cluster_products.head(top_n)
-        result_fields = ['asin', 'title', 'category', 'price', 'rating', 'review_count', 'sales_rank']
+        result_fields = ['asin', 'title', 'category', 'price', 'rating', 'review_count', 'sales_rank', 'imgUrl', 'productURL']
         return recommendations[result_fields].to_dict('records')
 
     def get_recommendations(self, user_input, method='hybrid', top_n=5):
