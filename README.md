@@ -1,4 +1,4 @@
-# Hack_arizona
+# AMAZON recommendation model 
 from notion_client import Client
 
 notion = Client(auth="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")
